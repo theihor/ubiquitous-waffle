@@ -6,6 +6,8 @@
 	       :src/main
                :src/game-state
                :src/game-protocol
+	       :src/graph
+               :src/bfs
 	       )
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)))

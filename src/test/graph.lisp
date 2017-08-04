@@ -49,3 +49,12 @@
            (otherwise (assert-true nil)))))
       (assert-true was-2)
       (assert-true was-3))))
+
+(define-test any-neighbour.1
+  (let ((graph (make-graph 'array-graph
+                           :num-nodes 5)))
+    (add-edge graph 0 1 5)
+    (assert-equal 1 (any-neighbour graph 0))
+    (assert-equal 0 (any-neighbour graph 1))
+    (remove-edge graph 0 1)
+    (assert-nil (any-neighbour graph 1))))

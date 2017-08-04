@@ -1,4 +1,9 @@
-(in-package :src/main)
+(uiop:define-package :src/encode
+    (:use :common-lisp))
+
+(declaim (optimize (debug 3) (safety 3)))
+
+(in-package :src/encode)
 
 (defmethod yason:encode ((obj claim) &optional stream)
   (yason:with-output (stream)
