@@ -87,3 +87,9 @@
 
 (defun parse-map (map)
   (parse-map-inner (yason:parse map)))
+
+(defun parse-map-from-file (map-file) 
+  (with-open-file (stream map-file)
+    (let ((contents (make-string (file-length stream))))
+      (read-sequence contents stream)
+      (parse-map contents))))

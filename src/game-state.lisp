@@ -91,3 +91,17 @@
        (assert (eq (get-edge the-map src tgt) :free))
        (claim-edge (elt (punters state) id) src tgt (distance-tab state))
        (add-edge the-map src tgt id)))))
+
+(defun dump-state (state file)
+  (let ((rev-dist (make-hash-table :test #'equal)))
+    (maphash (lambda (mine-node d)
+               (let ((tab (or (gethash (cdr mine-node) rev-dist)
+                              (make-hash-table))))
+                 (setf (gethash (car mine-node) tab) d)
+                 (setf (gethash (cdr mine-node) rev-dist) tab)))
+             (distance-tab state))
+    (graph::graph->dot
+     (game-map state) file
+     :node-label (lambda (n)
+                   (format nil "\"~A\""(alexandria:hash-table-values
+                                        (gethash n rev-dist)))))))

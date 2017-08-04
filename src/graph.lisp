@@ -38,7 +38,7 @@
   (:documentation "Map func with params (node edge-data) to all edges coming from node"))
 (defgeneric clone-graph (graph)
   (:documentation "Make a copy of the graph"))
-(defgeneric graph->dot (graph file)
+(defgeneric graph->dot (graph file &key edge-label node-label)
   (:documentation "Dump graph to file in dot format"))
 
 
@@ -159,17 +159,23 @@ Nil when there is no neighbours."
        'hash-graph
        :edges tab))))
 
-(defmethod graph->dot ((graph hash-graph) file)
+(defmethod graph->dot ((graph hash-graph) file &key (edge-label nil) (node-label nil))
   (with-open-file (s file
                      :direction :output
                      :if-exists :supersede
                      :if-does-not-exist :create)
     (format s "graph g {~%")
     (with-slots (edges) graph
-        (maphash (lambda (source targets)
-                   (loop :for target :being :the :hash-keys :in targets :do
-                      (format s "~A -- ~A;" source target)))
-                 edges))
+      (maphash (lambda (source targets)
+                 (format s "~A [label=~A];~%" source (when node-label (funcall node-label source)))
+                 (maphash (lambda (target data)
+                            (when (< source target)
+                              (format s "~A -- ~A [label=~A];~%"
+                                      source target (if edge-label
+                                                        (funcall edge-label source target)
+                                                        data))))
+                          targets))
+               edges))
     (format s "}~%")))
 
 
