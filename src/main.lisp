@@ -1,12 +1,12 @@
 (defpackage :src/main
   (:nicknames :main)
-  (:use :common-lisp))
+  (:use :common-lisp :src/decode :src/encode :src/game-protocol))
 
 (in-package :src/main)
 
 (require 'sb-bsd-sockets)
 
-;; via tcp sockets
+;; tcp
 (defparameter *punter-server* "punter.inf.ed.ac.uk")
 (defparameter *game-port* 9091)
 
@@ -44,18 +44,36 @@
      (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t)))
        (read-with-size stream))))
 
-(defparameter *reg* "23:{\"me\":\"SpiritRaccoons\"}")
-
 (defun main-online ()
   (print "Online.")
-  (let ((socket (tcp-connect *punter-server* *game-port*)))
+  (let ((socket (tcp-connect *punter-server* *game-port*))
+	(setup))
     (unwind-protect
 	 (progn
-	   ;; initial registration
-	   (tcp-send socket *reg*)
-	   (let ((res (tcp-read socket)))
-	     (break)
-	     (print res)))
+	   ;; send me
+	   (format t "Sending me...~%")
+	   (tcp-send socket (encode-me "SpiritRaccoons"))
+	   ;; get you
+	   (format t "Getting you... ~A~%" (tcp-read socket))
+	   ;; get setup
+	   (setf setup (parse-setup (tcp-read socket)))
+	   (when setup
+	     (format t "Getting setup... Punter:~A~%" (setup-punter setup))
+	     ;; send ready
+	     (format t "Sending ready...~%")
+	     (tcp-send socket (encode-ready (setup-punter setup)))
+	     ;; loop for moves until stop
+	     (loop
+		  ;; get move
+		  (let ((move (parse-move (tcp-read socket))))
+		    ;; send claim
+		    (tcp-send socket (encode-move (make-instance 'pass :punter (setup-punter setup))))
+		    )
+		  )
+
+	     )	   
+	   ;; get stop
+	   )
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
