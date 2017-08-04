@@ -9,7 +9,8 @@
            #:game-map
            #:mines
            #:id
-           #:players-number))
+           #:players-number
+           #:mapc-claims))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -64,18 +65,24 @@
         (add-edge g src tgt :free)))
     g))
 
+(defun mapc-claims (moves func)
+  (dolist (m moves)
+    (etypecase m
+      (pass nil)
+      (claim
+       (let ((id (move-punter m))
+             (src (claim-source m))
+             (tgt (claim-target m)))
+         (assert (integerp id))
+         (assert (integerp src))
+         (assert (integerp tgt))
+         (funcall func id src tgt))))))
+
 (defun process-moves (state moves)
   (let ((the-map (game-map state)))
-    (dolist (m moves)
-      (etypecase m
-        (pass nil)
-        (claim
-         (let ((id (move-punter m))
-               (src (claim-source m))
-               (tgt (claim-target m)))
-           (assert (integerp id))
-           (assert (integerp src))
-           (assert (integerp tgt))
-           (assert (eq (get-edge the-map src tgt) :free))
-           (claim-edge (elt (punters state) id) src tgt (distance-tab state))
-           (add-edge the-map src tgt id)))))))
+    (mapc-claims
+     moves
+     (lambda (id src tgt)
+       (assert (eq (get-edge the-map src tgt) :free))
+       (claim-edge (elt (punters state) id) src tgt (distance-tab state))
+       (add-edge the-map src tgt id)))))
