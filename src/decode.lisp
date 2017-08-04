@@ -1,6 +1,7 @@
 (uiop:define-package :src/decode
     (:use :common-lisp :anaphora :src/game-protocol)
-  (:export #:parse-you
+  (:export #:parse
+           #:parse-you
            #:parse-setup
            #:parse-moves
            #:parse-stop
@@ -65,25 +66,66 @@
    :scores (mapcar #'parse-score (gethash "scores" stop-ht))))
 
 
+(defun get-handshake (msg-ht)
+  (gethash "you" msg-ht))
+
+(defun setup-p (msg-ht)
+  (and (gethash "punter" msg-ht)
+       (gethash "punters" msg-ht)
+       (gethash "map" msg-ht)))
+
+(defun parse-setup-inner (setup-ht)
+  (make-instance
+   'setup
+   :punter (gethash "punter" setup-ht)
+   :punters (gethash "punters" setup-ht)
+   :map (parse-map-inner (gethash "map" setup-ht))))
+
+(defun get-move (msg-ht)
+  (gethash "move" msg-ht))
+
+(defun get-stop (msg-ht)
+  (gethash "stop" msg-ht))
+
+(defun get-timeout (msg-ht)
+  (gethash "timeout" msg-ht))
+
+
 (defun parse-you (msg)
   (let ((you-ht (yason:parse msg)))
-    (gethash "you" you-ht)))
+    (get-handshake you-ht)))
 
 (defun parse-setup (msg)
   (let ((setup-ht (yason:parse msg)))
-    (make-instance
-     'setup
-     :punter (gethash "punter" setup-ht)
-     :punters (gethash "punters" setup-ht)
-     :map (parse-map-inner (gethash "map" setup-ht)))))
+    (parse-setup-inner setup-ht)))
 
 (defun parse-moves (msg)
   (let ((move-ht (yason:parse msg)))
-    (parse-moves-inner (gethash "move" move-ht))))
+    (parse-moves-inner (get-move move-ht))))
 
 (defun parse-stop (msg)
   (let ((score-ht (yason:parse msg)))
-    (parse-stop-inner (gethash "stop" score-ht))))
+    (parse-stop-inner (get-stop score-ht))))
 
 (defun parse-map (map)
   (parse-map-inner (yason:parse map)))
+
+(defun parse (json)
+  (let ((json-ht (yason:parse json)))
+    (acond
+      ((get-handshake json-ht)
+       it)
+      ((setup-p json-ht)
+       (parse-setup-inner json-ht))
+      ((get-move json-ht)
+       (parse-moves-inner it))
+      ((get-stop json-ht)
+       (parse-stop-inner it))
+      ((get-timeout json-ht)
+       it))))
+
+(defun parse-map-from-file (map-file) 
+  (with-open-file (stream map-file)
+    (let ((contents (make-string (file-length stream))))
+      (read-sequence contents stream)
+      (parse-map contents))))

@@ -1,14 +1,15 @@
 (defpackage :src/main
   (:nicknames :main)
-  (:use :common-lisp))
+  (:use :common-lisp :src/decode :src/encode 
+	:src/game-protocol :src/game-player))
 
 (in-package :src/main)
 
 (require 'sb-bsd-sockets)
 
-;; via tcp sockets
+;; tcp
 (defparameter *punter-server* "punter.inf.ed.ac.uk")
-(defparameter *game-port* 9091)
+(defparameter *game-port* 9002)
 
 (defun nslookup (hostname)
    (and hostname
@@ -44,18 +45,49 @@
      (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t)))
        (read-with-size stream))))
 
-(defparameter *reg* "23:{\"me\":\"SpiritRaccoons\"}")
-
-(defun main-online ()
+;;run example (main-online 9066 'cowboy-player)
+(defun main-online (port &rest player-params)
   (print "Online.")
-  (let ((socket (tcp-connect *punter-server* *game-port*)))
+  (let ((socket (tcp-connect *punter-server* port))
+	(player (apply #'make-player player-params))
+	(setup))
     (unwind-protect
 	 (progn
-	   ;; initial registration
-	   (tcp-send socket *reg*)
-	   (let ((res (tcp-read socket)))
-	     (break)
-	     (print res)))
+	   ;; send me
+	   (format t "Sending me...~%")
+	   (tcp-send socket (encode-me "SpiritRaccoons"))
+	   ;; get you
+	   (format t "Getting you... ~A~%" (tcp-read socket))
+	   ;; get setup
+	   (setf setup (tcp-read socket))
+	   (format t "~A~%" setup)
+	   (setf setup (parse-setup setup))
+	   (when setup
+	     (format t "Getting setup... Punter:~A~%" (setup-punter setup))
+	     (init-player player setup)
+	     ;; send ready
+	     (format t "Sending ready...~%")
+	     (tcp-send socket (encode-ready (setup-punter setup)))
+	     ;; loop for moves until stop
+	     (loop
+		  ;; get move
+		  (let ((move-or-stop (tcp-read socket))
+			(move)
+			(stop))
+		    (format t "~A~%" move-or-stop)
+		    (handler-case
+		    	(setf move (parse-moves move-or-stop))
+		    	(error () (setf stop (parse-stop move-or-stop))))
+		    (if move
+			(progn
+			  (update-player player move)
+			  (let ((new-move (select-move player)))
+			    ;; send claim
+			    (tcp-send socket (encode-move new-move))))
+		      ;;game stop
+		      (progn
+			(format t "Game stop.~%")
+			(return)))))))
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
