@@ -67,7 +67,7 @@
     (labels ((%run ()
                (let ((move (select-move player)))
                  (format t "Move : ~A~%" (encode-move move))
-                 ;; (format t "Score: ~A~%" (score (elt (punters ))))
+                 (format t "Score: ~A~%" (score (elt (punters (state player)) 0)))
                  (if (typep move 'pass)
                      nil
                      (progn
