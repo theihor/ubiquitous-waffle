@@ -8,7 +8,7 @@
 ;; (ql:quickload 'fset)
 (ql:quickload 'lisp-unit)
 ;; (ql:quickload 'cl-quickcheck)
-;; (ql:quickload 'alexandria)
+(ql:quickload 'alexandria)
 ;; (ql:quickload 'cl-graph)
 ;; (ql:quickload 'cl-heap)
 ;; (ql:quickload 'spatial-trees)
