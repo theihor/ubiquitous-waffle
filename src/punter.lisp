@@ -38,6 +38,11 @@
      (setf (gethash mine (gethash mine (site->mines p))) t)
      (setf (gethash mine (gethash mine (mine->sites p))) t)))
 
+(defmacro sqr (form)
+  (alexandria:with-gensyms (x)
+    `(let ((,x ,form))
+       (* ,x ,x))))
+
 (defgeneric claim-edge (punter node1 node2 distance-tab))
 
 (defmethod claim-edge ((p punter) node1 node2 distance-tab)
@@ -49,7 +54,7 @@
                  (unless (%node-reachable? mine node)
                    (setf (gethash node (gethash mine mine->sites)) t)
                    (setf (gethash mine (gethash node site->mines)) t)
-                   (incf score (gethash (cons mine node) distance-tab))
+                   (incf score (sqr (gethash (cons mine node) distance-tab)))
                    (mapc-node-edges graph node
                                     (lambda (n data)
                                       (declare (ignore data))
@@ -65,11 +70,6 @@
                  (incf (score p) (%add-node mine node1)))
                (gethash node2 site->mines))))
   p)
-
-(defmacro sqr (form)
-  (alexandria:with-gensyms (x)
-    `(let ((,x ,form))
-       (* ,x ,x))))
 
 (defun estimate-score (punter node1 node2 distance-tab)
   "Does not mute `punter'"
