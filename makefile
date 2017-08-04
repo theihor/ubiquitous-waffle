@@ -1,7 +1,9 @@
-all:
-	sbcl --load build.lisp "$@"
-clean:
-	rm -f main result.txt
+online:
+	sbcl --load build-online.lisp "$@"
 
-test: all
-	time ./main
+offline:
+	sbcl --load build-offline.lisp "$@"
+
+clean:
+	rm -f online
+	rm -f offline

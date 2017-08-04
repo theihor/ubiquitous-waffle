@@ -4,8 +4,11 @@
 
 (in-package :src/main)
 
-(defun main ()
-  (print "Hello World!!!"))
+(defun main-online ()
+  (print "Online."))
+
+(defun main-offline ()
+  (print "Offline"))
 
 ;; (defun main ()
 ;;   (when sb-ext:*posix-argv*
