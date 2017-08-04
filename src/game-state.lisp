@@ -24,22 +24,27 @@
        :type integer)
    (players-number :initarg :players-number
                    :reader players-number
-                   :type integer)))
+                   :type integer)
+   (punters :initarg :punters
+            :accessor punters)))
 
 (defun make-game-state (setup-message)
-  (let ((sites-number (map-sites (setup-map setup-message))))
+  (let ((sites-number (map-sites (setup-map setup-message)))
+        (punters-number (setup-punters setup-message)))
     (assert (integerp sites-number))
     (make-instance
      'game
      :id (setup-punter setup-message)
-     :players-number (setup-punters setup-message)
+     :players-number punters-number
      :mines (mapcar (lambda (x)
                       (assert (integerp x))
                       (assert (< x sites-number))
                       x)
                     (map-mines (setup-map setup-message)))
      :game-map (build-map (setup-map setup-message)
-                          sites-number))))
+                          sites-number)
+     :punters (loop :for id :from 0 :below punters-number :collect
+                 (make-instance 'punter :id id)))))
 
 (defun build-map (the-map num-nodes)
   (let ((g (make-graph 'array-graph :num-nodes num-nodes)))
