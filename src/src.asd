@@ -5,11 +5,9 @@
   :depends-on (
 	       :src/main
 	       )
-  ;;:in-order-to ((test-op (load-op )))
-  ;;:perform ;; (test-op (o c)
-           ;;          (lisp-unit:run-tests :all :src/test/field)
-           ;;          (lisp-unit:run-tests :all :src/test/state)
-           ;;          (lisp-unit:run-tests :all :src/test/parser))
+  :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)))
+  :perform (asdf:test-op (o c)
+                         (lisp-unit:run-tests :all :src/test/graph))
   )
 
 ;;(register-system-packages :spatial-trees '(:rectangles))
