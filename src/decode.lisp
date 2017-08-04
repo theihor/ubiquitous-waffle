@@ -1,6 +1,7 @@
 (uiop:define-package :src/decode
     (:use :common-lisp :src/game-protocol)
-  (:export #:parse-setup))
+  (:export #:parse-you
+           #:parse-setup))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -29,6 +30,11 @@
    :sites (parse-sites-inner (gethash "sites" map-ht))
    :rivers (parse-rivers-inner (gethash "rivers" map-ht))
    :mines (gethash "mines" map-ht)))
+
+
+(defun parse-you (msg)
+  (let ((you-ht (yason:parse (get-json-from-msg msg))))
+    (gethash "you" you-ht)))
 
 (defun parse-setup (msg)
   (let ((setup-ht (yason:parse (get-json-from-msg msg))))
