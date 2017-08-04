@@ -102,7 +102,6 @@ Nil when there is no neighbours."
        :num-nodes num-nodes
        :edges arr))))
 
-
 ;; Hash graph
 
 (defclass hash-graph (graph)
