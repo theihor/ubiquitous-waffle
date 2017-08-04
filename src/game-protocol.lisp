@@ -9,7 +9,7 @@
            #:map-rivers
            #:map-mines
            #:river
-           #:reiver-source
+           #:river-source
            #:river-target
            #:move
            #:move-punter
