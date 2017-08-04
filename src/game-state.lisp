@@ -46,14 +46,20 @@
                       x)
                     (map-mines (setup-map setup-message)))
      :game-map (build-map (setup-map setup-message)
-                          sites-number)
-     :punters (make-array (list punters-number)
-                          :initial-contents (loop :for id :from 0 :below punters-number :collect
-                                               (make-instance 'punter :id id))))))
+                          sites-number))))
 
 (defmethod initialize-instance :after ((state game) &key)
   (setf (distance-tab state)
-        (bfs:multiple-bfs-distances (game-map state) (mines state))))
+        (bfs:multiple-bfs-distances (game-map state) (mines state)))
+  (setf (punters state)
+        (make-array
+         (list (players-number state))
+         :initial-contents (loop :for id :from 0 :below (players-number state) :collect
+                              (make-instance 'punter
+                                             :id id
+                                             :graph (make-graph 'array-graph
+                                                                :num-nodes (num-nodes (game-map state)))
+                                             :mines (mines state))))))
 
 (defun build-map (the-map num-nodes)
   (let ((g (make-graph 'array-graph :num-nodes num-nodes)))

@@ -11,12 +11,14 @@
            #:clone-graph
            
            #:array-graph
-           #:num-edges))
+           #:num-edges
+           #:num-nodes))
 
 (in-package :src/graph)
 
 (defclass array-graph ()
-  ((num-nodes :initarg :num-nodes)
+  ((num-nodes :initarg :num-nodes
+              :reader num-nodes)
    (edges :initarg :edges)))
 
 (defgeneric add-edge (graph node1 node2 data)

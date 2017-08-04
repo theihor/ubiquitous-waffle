@@ -18,7 +18,7 @@
                 :accessor site->mines
                 :type hash-table
                 :documentation "Table of kind site -> { mine -> t }")
-   (graph :initform (make-graph 'array-graph)
+   (graph :initarg :graph
           :accessor punter-graph
           :type array-graph
           :documentation "Graph of edges claimed by this punter")
@@ -26,6 +26,16 @@
           :initform 0
           :type integer
           :accessor score)))
+
+(defmethod initialize-instance :after ((p punter) &key mines)
+  (loop :for id :from 0 :to (num-nodes (punter-graph p)) :do
+     (setf (gethash id (site->mines p))
+           (make-hash-table :test #'eq)))
+  (loop :for mine :in mines :do
+     (setf (gethash mine (mine->sites p))
+           (make-hash-table :test #'eq))
+     (setf (gethash mine (gethash mine (site->mines p))) t)
+     (setf (gethash mine (gethash mine (mine->sites p))) t)))
 
 (defgeneric claim-edge (punter node1 node2 distance-tab))
 
