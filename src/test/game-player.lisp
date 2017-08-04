@@ -3,7 +3,10 @@
           :src/game-state
           :src/game-player
           :src/game-protocol
-          :src/graph)
+          :src/punter
+          :src/graph
+          :src/decode
+          :src/encode)
   (:import-from :lisp-unit
                 :assert-true
                 :assert-equal)
@@ -57,3 +60,21 @@
      (lambda (move)
        (assert-true (typep move 'pass))
        (assert-equal 0 (move-punter move))))))
+
+
+(defun play-map (path-to-json &rest player-params)
+  (let ((player (apply #'make-player player-params)))
+    (labels ((%run ()
+               (let ((move (select-move player)))
+                 (format t "Move : ~A~%" (encode-move move))
+                 ;; (format t "Score: ~A~%" (score (elt (punters ))))
+                 (if (typep move 'pass)
+                     nil
+                     (progn
+                       (update-player player (list move))
+                       (%run))))))
+      (init-player player (make-instance 'setup
+                                         :punter 0
+                                         :punters 1
+                                         :map (parse-map (alexandria:read-file-into-string path-to-json))))
+      (%run))))
