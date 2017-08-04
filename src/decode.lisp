@@ -3,7 +3,8 @@
   (:export #:parse-you
            #:parse-setup
            #:parse-moves
-           #:parse-stop))
+           #:parse-stop
+           #:parse-map))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -83,3 +84,6 @@
 (defun parse-stop (msg)
   (let ((score-ht (yason:parse msg)))
     (parse-stop-inner (gethash "stop" score-ht))))
+
+(defun parse-map (map)
+  (parse-map-inner (yason:parse map)))
