@@ -10,7 +10,8 @@
   "Returns hash-table of kind node -> distance"
   (let ((distances (make-hash-table :test #'eq)) 
         (steps 0)
-        (nodes (list root))) 
+        (nodes (list root)))
+    (setf (gethash root distances) 0)
     (labels ((%visited? (node)
                (gethash node distances))
              (%step (node)
