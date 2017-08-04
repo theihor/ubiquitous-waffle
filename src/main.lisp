@@ -1,7 +1,10 @@
 (defpackage :src/main
   (:nicknames :main)
   (:use :common-lisp :src/decode :src/encode 
-	:src/game-protocol :src/game-player))
+	:src/game-protocol
+        :src/game-player
+        :src/punter
+        :src/game-state))
 
 (in-package :src/main)
 
@@ -87,6 +90,11 @@
 		      ;;game stop
 		      (progn
 			(format t "Game stop.~%")
+                        (format t "Computed score:~%")
+                        (loop :for punter :below (players-number (state player))
+                           :do (format t "~A :~A~%"
+                                       punter
+                                       (score (elt (punters (state player)) punter))))
 			(return)))))))
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
