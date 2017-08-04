@@ -1,5 +1,5 @@
 (uiop:define-package :src/decode
-    (:use :common-lisp :src/game-protocol)
+    (:use :common-lisp :anaphora :src/game-protocol)
   (:export #:parse-you
            #:parse-setup))
 
@@ -31,6 +31,28 @@
    :rivers (parse-rivers-inner (gethash "rivers" map-ht))
    :mines (gethash "mines" map-ht)))
 
+(defun parse-claim (claim-ht)
+  (make-instance
+   'claim
+   :punter (gethash "punter" claim-ht)
+   :source (gethash "source" claim-ht)
+   :target (gethash "target" claim-ht)))
+
+(defun parse-pass (pass-ht)
+  (make-instance
+   'pass
+   :punter (gethash "punter" pass-ht)))
+
+(defun parse-move (move-ht)
+  (acond
+    ((gethash "claim" move-ht)
+     (parse-claim it))
+    ((gethash "pass" move-ht)
+     (parse-pass it))
+    (t (error "unknown type of move"))))
+
+(defun parse-moves-inner (moves-ht)
+  (mapcar #'parse-move (gethash "moves" moves-ht)))
 
 (defun parse-you (msg)
   (let ((you-ht (yason:parse (get-json-from-msg msg))))
@@ -43,3 +65,7 @@
      :punter (gethash "punter" setup-ht)
      :punters (gethash "punters" setup-ht)
      :map (parse-map-inner (gethash "map" setup-ht)))))
+
+(defun parse-moves (msg)
+  (let ((move-ht (yason:parse (get-json-from-msg msg))))
+    (parse-moves-inner (gethash "move" move-ht))))
