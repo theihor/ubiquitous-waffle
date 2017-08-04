@@ -9,6 +9,8 @@
            #:array-graph
            #:num-edges))
 
+(in-package :src/graph)
+
 (defclass array-graph ()
   ((num-nodes :initarg :num-nodes)
    (edges :initarg :edges)))

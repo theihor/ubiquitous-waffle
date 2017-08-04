@@ -4,7 +4,8 @@
   :pathname #p"./"
   :depends-on (
 	       :src/main
-	       )
+	       :src/bfs
+           :src/graph)
   ;;:in-order-to ((test-op (load-op )))
   ;;:perform ;; (test-op (o c)
            ;;          (lisp-unit:run-tests :all :src/test/field)
