@@ -1,10 +1,12 @@
 (uiop:define-package :src/graph
-    (:use :common-lisp)
+    (:nicknames :graph)
+  (:use :common-lisp)
   (:export #:add-edge
            #:get-edge
            #:remove-edge
            #:make-graph
            #:mapc-node-edges
+           #:any-neighbour
            
            #:array-graph
            #:num-edges))
@@ -65,3 +67,12 @@
     (make-instance 'array-graph
                    :num-nodes num-nodes
                    :edges arr)))
+
+(defun any-neighbour (graph node)
+  "Returns two value - node index and data for some neighbour of node.
+Nil when there is no neighbours."
+  (mapc-node-edges
+   graph node
+   (lambda (neighbour data)
+     (return-from any-neighbour (values neighbour data))))
+  nil)
