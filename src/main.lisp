@@ -1,6 +1,7 @@
 (defpackage :src/main
   (:nicknames :main)
-  (:use :common-lisp :src/decode :src/encode :src/game-protocol))
+  (:use :common-lisp :src/decode :src/encode 
+	:src/game-protocol :src/game-player))
 
 (in-package :src/main)
 
@@ -44,9 +45,11 @@
      (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t)))
        (read-with-size stream))))
 
-(defun main-online ()
+;;run example (main-online 9066 'cowboy-player)
+(defun main-online (port &rest player-params)
   (print "Online.")
-  (let ((socket (tcp-connect *punter-server* *game-port*))
+  (let ((socket (tcp-connect *punter-server* port))
+	(player (apply #'make-player player-params))
 	(setup))
     (unwind-protect
 	 (progn
@@ -61,6 +64,7 @@
 	   (setf setup (parse-setup setup))
 	   (when setup
 	     (format t "Getting setup... Punter:~A~%" (setup-punter setup))
+	     (init-player player setup)
 	     ;; send ready
 	     (format t "Sending ready...~%")
 	     (tcp-send socket (encode-ready (setup-punter setup)))
@@ -75,8 +79,11 @@
 		    	(setf move (parse-moves move-or-stop))
 		    	(error () (setf stop (parse-stop move-or-stop))))
 		    (if move
-		      ;; send claim
-		      (tcp-send socket (encode-move (make-instance 'pass :punter (setup-punter setup))))
+			(progn
+			  (update-player player move)
+			  (let ((new-move (select-move player)))
+			    ;; send claim
+			    (tcp-send socket (encode-move new-move))))
 		      ;;game stop
 		      (progn
 			(format t "Game stop.~%")
