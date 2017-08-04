@@ -52,6 +52,9 @@
   ((source :initarg :source :accessor claim-source)
    (target :initarg :target :accessor claim-target)))
 
+(defmethod print-object ((c claim) s)
+  (format s "~A->~A" (claim-source c) (claim-target c)))
+
 (defclass pass (move) ())
 ;;;
 

@@ -25,8 +25,9 @@
                                       (setf (gethash successor distances) steps))))
                  next-nodes)))
       (loop :while nodes :do
+          (incf steps)
          (setf nodes (loop :for n :in nodes :append (%step n)))
-         (incf steps))
+        )
       distances)))
 
 (defun multiple-bfs-distances (g source-nodes)

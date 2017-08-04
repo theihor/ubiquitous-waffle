@@ -8,7 +8,8 @@
    #:init-player
    #:update-player
    #:select-move
-   #:cowboy-player))
+   #:cowboy-player
+   #:state))
 
 (declaim (optimize (debug 3) (safety 3)))
 
