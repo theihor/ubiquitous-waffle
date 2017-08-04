@@ -1,3 +1,4 @@
-# ubiquitous-waffle
-# push test
-fake7
+Required:
+- SBCL
+- Quicklisp: /home/quicklisp/setup.lisp
+
