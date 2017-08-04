@@ -1,20 +1,24 @@
 (uiop:define-package :src/graph
     (:nicknames :graph)
   (:use :common-lisp)
+  (:import-from :alexandria)
   (:export #:add-edge
            #:get-edge
            #:remove-edge
            #:make-graph
            #:mapc-node-edges
            #:any-neighbour
+           #:clone-graph
            
            #:array-graph
-           #:num-edges))
+           #:num-edges
+           #:num-nodes))
 
 (in-package :src/graph)
 
 (defclass array-graph ()
-  ((num-nodes :initarg :num-nodes)
+  ((num-nodes :initarg :num-nodes
+              :reader num-nodes)
    (edges :initarg :edges)))
 
 (defgeneric add-edge (graph node1 node2 data)
@@ -27,6 +31,8 @@
   (:documentation "Make graph of class graph-class with params"))
 (defgeneric mapc-node-edges (graph node func)
   (:documentation "Map func with params (node edge-data) to all edges coming from node"))
+(defgeneric clone-graph (graph)
+  (:documentation "Make a copy of the graph"))
 
 (defun check-nodes (graph &rest node-nums)
   (with-slots (num-nodes) graph
@@ -76,3 +82,14 @@ Nil when there is no neighbours."
    (lambda (neighbour data)
      (return-from any-neighbour (values neighbour data))))
   nil)
+
+(defmethod clone-graph ((graph array-graph))
+  (with-slots (num-nodes edges) graph
+    (let ((arr (make-array (list num-nodes))))
+      (loop :for ind :below num-nodes
+         :do (setf (elt arr ind)
+                   (alexandria:copy-hash-table (elt edges ind))))
+      (make-instance
+       'array-graph
+       :num-nodes num-nodes
+       :edges arr))))

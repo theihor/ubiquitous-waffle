@@ -2,10 +2,22 @@
   :class :package-inferred-system
   :defsystem-depends-on (:asdf-package-system)
   :pathname #p"./"
-  :depends-on (:src/main)
-  :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)))
-  :perform (asdf:test-op (o c)
-                         (lisp-unit:run-tests :all :src/test/graph))
+  :depends-on (
+	       :src/main
+               :src/game-state
+               :src/game-protocol
+	       :src/graph
+               :src/bfs
+               :src/game-player
+	       )
+  :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
+                              (asdf:load-op :src/test/game-state)
+                              (asdf:load-op :src/test/game-player)))
+  :perform (asdf:test-op
+            (o c)
+            (lisp-unit:run-tests :all :src/test/graph)
+            (lisp-unit:run-tests :all :src/test/game-state)
+            (lisp-unit:run-tests :all :src/test/game-player))
   )
 
 ;;(register-system-packages :spatial-trees '(:rectangles))
