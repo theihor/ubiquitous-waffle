@@ -4,9 +4,62 @@
 
 (in-package :src/main)
 
-(defun main-online ()
-  (print "Online."))
+(require 'sb-bsd-sockets)
 
+;; via tcp sockets
+(defparameter *punter-server* "punter.inf.ed.ac.uk")
+(defparameter *game-port* 9091)
+
+(defun nslookup (hostname)
+   (and hostname
+       (sb-bsd-sockets:host-ent-address (sb-bsd-sockets:get-host-by-name hostname))))
+
+(defun tcp-connect (server port)
+  (when (and server port)
+    (handler-case
+	(let ((socket (make-instance 'sb-bsd-sockets:inet-socket :type  :stream :protocol :tcp)))
+	  (sb-bsd-sockets:socket-connect socket (nslookup server) port)
+	  socket)
+      (host-not-found-error ()
+	(format t "Host ~A not found." server)
+	(force-output)
+	nil))))
+
+(defun tcp-send (socket data)
+   (when (and socket data)
+     (sb-bsd-sockets:socket-send socket data (length data) :external-format :utf-8)))
+
+(defun read-with-size (stream &optional (size "") (state 0))
+  (case state
+    (0 (let ((c (read-char stream)))
+	 (if (char= c #\:)
+	     (read-with-size stream (parse-integer size) 1)
+	     (read-with-size stream (concatenate 'string size (string c)) 0))))
+    (1 (let* ((str (make-string size)))
+	 (read-sequence str stream)
+	 str))))
+
+(defun tcp-read (socket)
+   (when socket
+     (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t)))
+       (read-with-size stream))))
+
+(defparameter *reg* "23:{\"me\":\"SpiritRaccoons\"}")
+
+(defun main-online ()
+  (print "Online.")
+  (let ((socket (tcp-connect *punter-server* *game-port*)))
+    (unwind-protect
+	 (progn
+	   ;; initial registration
+	   (tcp-send socket *reg*)
+	   (let ((res (tcp-read socket)))
+	     (break)
+	     (print res)))
+      (progn (format t "~&Closing listen socket~%")
+	     (sb-bsd-sockets:socket-close socket)))))
+
+;; via stdin, stdout, stderr
 (defun main-offline ()
   (print "Offline"))
 
