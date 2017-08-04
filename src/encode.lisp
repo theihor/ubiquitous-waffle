@@ -1,6 +1,7 @@
 (uiop:define-package :src/encode
     (:use :common-lisp :src/game-protocol)
-  (:export #:encode-me))
+  (:export #:encode-me
+           #:encode-ready))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -15,10 +16,20 @@
           (yason:encode-object-element "source" (claim-source obj))
           (yason:encode-object-element "target" (claim-target obj)))))))
 
+(defun encode-msg (json-msg)
+  (format nil "~a:~a" (length json-msg) json-msg))
+
+
 (defun encode-me (name)
-  (let ((result-str
-         (with-output-to-string (stream)
-           (yason:with-output (stream)
-             (yason:with-object ()
-               (yason:encode-object-element "me" name))))))
-    (format nil "~a:~a" (length result-str) result-str)))
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "me" name))))))
+
+(defun encode-ready (punter-id)
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "ready" punter-id))))))
