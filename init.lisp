@@ -6,7 +6,7 @@
 (require 'asdf)
 
 ;; (ql:quickload 'fset)
-;; (ql:quickload 'lisp-unit)
+(ql:quickload 'lisp-unit)
 ;; (ql:quickload 'cl-quickcheck)
 ;; (ql:quickload 'alexandria)
 ;; (ql:quickload 'cl-graph)

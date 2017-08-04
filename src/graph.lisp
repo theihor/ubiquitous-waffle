@@ -9,6 +9,8 @@
            #:array-graph
            #:num-edges))
 
+(in-package :src/graph)
+
 (defclass array-graph ()
   ((num-nodes :initarg :num-nodes)
    (edges :initarg :edges)))
@@ -59,4 +61,7 @@
   (let ((arr (make-array (list num-nodes))))
     (loop :for ind :below num-nodes
        :do (setf (elt arr ind)
-                 (make-hash-table :test #'equal)))))
+                 (make-hash-table :test #'equal)))
+    (make-instance 'array-graph
+                   :num-nodes num-nodes
+                   :edges arr)))
