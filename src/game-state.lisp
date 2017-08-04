@@ -1,7 +1,9 @@
 (uiop:define-package :src/game-state
     (:use :common-lisp
           :src/game-protocol
-          :src/graph)
+          :src/graph
+          :src/punter
+          :src/bfs)
   (:export #:make-game-state
            #:process-moves
            #:game-map
@@ -26,7 +28,8 @@
                    :reader players-number
                    :type integer)
    (punters :initarg :punters
-            :accessor punters)))
+            :accessor punters)
+   (distance-tab :accessor distance-tab)))
 
 (defun make-game-state (setup-message)
   (let ((sites-number (map-sites (setup-map setup-message)))
@@ -43,8 +46,13 @@
                     (map-mines (setup-map setup-message)))
      :game-map (build-map (setup-map setup-message)
                           sites-number)
-     :punters (loop :for id :from 0 :below punters-number :collect
-                 (make-instance 'punter :id id)))))
+     :punters (make-array (list punters-number)
+                          :initial-contents (loop :for id :from 0 :below punters-number :collect
+                                               (make-instance 'punter :id id))))))
+
+(defmethod initialize-instance :after ((state game) &key)
+  (setf (distance-tab state)
+        (bfs:multiple-bfs-distances (game-map state) (mines state))))
 
 (defun build-map (the-map num-nodes)
   (let ((g (make-graph 'array-graph :num-nodes num-nodes)))
@@ -69,4 +77,5 @@
            (assert (integerp src))
            (assert (integerp tgt))
            (assert (eq (get-edge the-map src tgt) :free))
+           (claim-edge (elt (punters state) id) src tgt (distance-tab state))
            (add-edge the-map src tgt id)))))))

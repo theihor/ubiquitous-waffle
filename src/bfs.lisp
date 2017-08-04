@@ -2,7 +2,8 @@
   (:nicknames :bfs)
   (:use :common-lisp)
   (:import-from :src/graph
-                :mapc-node-edges))
+                :mapc-node-edges)
+  (:export :multiple-bfs-distances))
 
 (in-package :bfs)
 
