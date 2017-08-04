@@ -29,7 +29,7 @@
 (defclass setup ()
   ((punter :initarg :punter :accessor setup-punter)
    (punters :initarg :punters :accessor setup-punters)
-   (map :initarg :map :accessor setup-map)))
+   (setup-map :initarg :map :accessor setup-map)))
 
 (defclass game-map ()
   ((sites :initarg :sites :accessor map-sites)
