@@ -61,4 +61,7 @@
   (let ((arr (make-array (list num-nodes))))
     (loop :for ind :below num-nodes
        :do (setf (elt arr ind)
-                 (make-hash-table :test #'equal)))))
+                 (make-hash-table :test #'equal)))
+    (make-instance 'array-graph
+                   :num-nodes num-nodes
+                   :edges arr)))
