@@ -8,7 +8,7 @@
 
 ;; tcp
 (defparameter *punter-server* "punter.inf.ed.ac.uk")
-(defparameter *game-port* 9091)
+(defparameter *game-port* 9002)
 
 (defun nslookup (hostname)
    (and hostname
@@ -56,7 +56,9 @@
 	   ;; get you
 	   (format t "Getting you... ~A~%" (tcp-read socket))
 	   ;; get setup
-	   (setf setup (parse-setup (tcp-read socket)))
+	   (setf setup (tcp-read socket))
+	   (format t "~A~%" setup)
+	   (setf setup (parse-setup setup))
 	   (when setup
 	     (format t "Getting setup... Punter:~A~%" (setup-punter setup))
 	     ;; send ready
@@ -65,15 +67,20 @@
 	     ;; loop for moves until stop
 	     (loop
 		  ;; get move
-		  (let ((move (parse-move (tcp-read socket))))
-		    ;; send claim
-		    (tcp-send socket (encode-move (make-instance 'pass :punter (setup-punter setup))))
-		    )
-		  )
-
-	     )	   
-	   ;; get stop
-	   )
+		  (let ((move-or-stop (tcp-read socket))
+			(move)
+			(stop))
+		    (format t "~A~%" move-or-stop)
+		    (handler-case
+		    	(setf move (parse-moves move-or-stop))
+		    	(error () (setf stop (parse-stop move-or-stop))))
+		    (if move
+		      ;; send claim
+		      (tcp-send socket (encode-move (make-instance 'pass :punter (setup-punter setup))))
+		      ;;game stop
+		      (progn
+			(format t "Game stop.~%")
+			(return)))))))
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
