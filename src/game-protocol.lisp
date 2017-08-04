@@ -19,7 +19,11 @@
            #:pass
            #:stop
            #:stop-moves
-           #:stop-scores))
+           #:stop-scores
+           #:score-info
+           #:score-info-punter
+           #:score-info-score
+           ))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -55,3 +59,6 @@
   ((moves :initarg :moves :accessor stop-moves)
    (scores :initarg :scores :accessor stop-scores)))
 
+(defclass score-info ()
+  ((punter :initarg :punter :accessor score-info-punter)
+   (score :initarg :score :accessor score-info-score)))

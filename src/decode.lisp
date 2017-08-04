@@ -1,7 +1,9 @@
 (uiop:define-package :src/decode
     (:use :common-lisp :anaphora :src/game-protocol)
   (:export #:parse-you
-           #:parse-setup))
+           #:parse-setup
+           #:parse-moves
+           #:parse-stop))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -54,6 +56,19 @@
 (defun parse-moves-inner (moves-ht)
   (mapcar #'parse-move (gethash "moves" moves-ht)))
 
+(defun parse-score (score-ht)
+  (make-instance
+   'score-info
+   :punter (gethash "punter" score-ht)
+   :score (gethash "score" score-ht)))
+
+(defun parse-stop-inner (stop-ht)
+  (make-instance
+   'stop
+   :moves (mapcar #'parse-move (gethash "moves" stop-ht))
+   :scores (mapcar #'parse-score (gethash "scores" stop-ht))))
+
+
 (defun parse-you (msg)
   (let ((you-ht (yason:parse (get-json-from-msg msg))))
     (gethash "you" you-ht)))
@@ -69,3 +84,7 @@
 (defun parse-moves (msg)
   (let ((move-ht (yason:parse (get-json-from-msg msg))))
     (parse-moves-inner (gethash "move" move-ht))))
+
+(defun parse-stop (msg)
+  (let ((score-ht (yason:parse (get-json-from-msg msg))))
+    (parse-stop-inner (gethash "stop" score-ht))))
