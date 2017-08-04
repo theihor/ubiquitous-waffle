@@ -24,7 +24,7 @@
    :punters 2
    :map (make-instance
          'game-map
-         :sites 3
+         :sites '(0 1 2)
          :mines (list 0 2)
          :rivers (list (make-instance 'river
                                       :source 0

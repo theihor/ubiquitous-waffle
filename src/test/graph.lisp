@@ -5,30 +5,31 @@
 
 (in-package :src/test/graph)
 
-(define-test simple.1
-  (let ((graph (make-graph 'array-graph
-                           :num-nodes 5)))
+(defun do-tests (&rest params)
+  (let ((graph (apply #'make-graph params)))
     (add-edge graph 0 1 5)
     (assert-equal 5 (get-edge graph 0 1))
     (assert-equal 5 (get-edge graph 1 0))
     (remove-edge graph 0 1)
     (assert-equal nil (get-edge graph 0 1))
-    (assert-equal nil (get-edge graph 1 0))))
-
-(define-test simple.2
-  (let ((graph (make-graph 'array-graph
-                           :num-nodes 5)))
+    (assert-equal nil (get-edge graph 1 0)))
+  (let ((graph (apply #'make-graph params)))
     (add-edge graph 0 1 5)
     (add-edge graph 1 0 6)
     (assert-equal 6 (get-edge graph 0 1))
     (assert-equal 6 (get-edge graph 1 0))
     (remove-edge graph 0 1)
     (assert-equal nil (get-edge graph 0 1))
-    (assert-equal nil (get-edge graph 1 0))))
-
-(define-test simple.3
-  (let ((graph (make-graph 'array-graph
-                           :num-nodes 5)))
+    (assert-equal nil (get-edge graph 1 0)))
+  (let ((graph (apply #'make-graph params)))
+    (add-edge graph 0 1 5)
+    (add-edge graph 1 0 6)
+    (assert-equal 6 (get-edge graph 0 1))
+    (assert-equal 6 (get-edge graph 1 0))
+    (remove-edge graph 0 1)
+    (assert-equal nil (get-edge graph 0 1))
+    (assert-equal nil (get-edge graph 1 0)))
+  (let ((graph (apply #'make-graph params)))
     (add-edge graph 0 2 5)
     (add-edge graph 0 3 6)
     (let ((was-2 nil)
@@ -48,13 +49,17 @@
             (setf was-3 t))
            (otherwise (assert-true nil)))))
       (assert-true was-2)
-      (assert-true was-3))))
-
-(define-test any-neighbour.1
-  (let ((graph (make-graph 'array-graph
-                           :num-nodes 5)))
+      (assert-true was-3)))
+  (let ((graph (apply #'make-graph params)))
     (add-edge graph 0 1 5)
     (assert-equal 1 (any-neighbour graph 0))
     (assert-equal 0 (any-neighbour graph 1))
     (remove-edge graph 0 1)
     (assert-nil (any-neighbour graph 1))))
+
+
+(define-test test.array.1
+  (do-tests 'array-graph :num-nodes 5))
+
+(define-test test.hash.1
+  (do-tests 'hash-graph))

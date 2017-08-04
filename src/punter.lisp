@@ -20,20 +20,20 @@
                 :documentation "Table of kind site -> { mine -> t }")
    (graph :initarg :graph
           :accessor punter-graph
-          :type array-graph
+          :type graph
           :documentation "Graph of edges claimed by this punter")
    (score :initarg :score
           :initform 0
           :type integer
           :accessor score)))
 
-(defmethod initialize-instance :after ((p punter) &key mines)
-  (loop :for id :from 0 :to (num-nodes (punter-graph p)) :do
+(defmethod initialize-instance :after ((p punter) &key mines sites)
+  (loop :for id :in sites :do
      (setf (gethash id (site->mines p))
-           (make-hash-table :test #'eq)))
+           (make-hash-table :test #'equal)))
   (loop :for mine :in mines :do
      (setf (gethash mine (mine->sites p))
-           (make-hash-table :test #'eq))
+           (make-hash-table :test #'equal))
      (setf (gethash mine (gethash mine (site->mines p))) t)
      (setf (gethash mine (gethash mine (mine->sites p))) t)))
 
