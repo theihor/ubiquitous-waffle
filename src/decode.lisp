@@ -6,6 +6,11 @@
 
 (in-package :src/decode)
 
+(defun get-json-from-msg (msg)
+  (let ((msg-len (length msg))
+        (json-len (parse-integer msg :junk-allowed t)))
+    (subseq msg (- msg-len json-len))))
+
 (defun parse-rivers-inner (rivers-lst)
   (mapcar
    (lambda (river-ht)
@@ -25,8 +30,8 @@
    :rivers (parse-rivers-inner (gethash "rivers" map-ht))
    :mines (gethash "mines" map-ht)))
 
-(defun parse-setup (json)
-  (let ((setup-ht (yason:parse json)))
+(defun parse-setup (msg)
+  (let ((setup-ht (yason:parse (get-json-from-msg msg))))
     (make-instance
      'setup
      :punter (gethash "punter" setup-ht)
