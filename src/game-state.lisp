@@ -10,7 +10,9 @@
            #:mines
            #:id
            #:players-number
-           #:mapc-claims))
+           #:mapc-claims
+           #:punters
+           #:distance-tab))
 
 (declaim (optimize (debug 3) (safety 3)))
 

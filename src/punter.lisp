@@ -65,3 +65,38 @@
                (gethash node2 site->mines))))
   p)
 
+(defmacro sqr (form)
+  (alexandria:with-gensyms (x)
+    `(let ((,x ,form))
+       (* ,x ,x))))
+
+(defun estimate-score (punter node1 node2 distance-tab)
+  "Does not mute `punter'"
+  (with-slots (mine->sites site->mines graph) punter
+    (let ((mine->sites-aux (make-hash-table :test #'equal))
+          (delta-score 0))
+      (labels ((%node-reachable? (mine node)
+                 (or (gethash node (gethash mine mine->sites))
+                     (gethash (cons mine node) mine->sites-aux)))
+               (%add-node (mine node)
+                 (let ((score 0))
+                   (unless (%node-reachable? mine node)
+                     (setf (gethash (cons mine node) mine->sites-aux) t)
+                     (incf score (sqr (gethash (cons mine node) distance-tab)))
+                     (mapc-node-edges graph node
+                                      (lambda (n data)
+                                        (declare (ignore data))
+                                        (incf score (%add-node mine n)))))
+                   score)))
+        ;; (graph:add-edge graph node1 node2 t)
+        (maphash (lambda (mine val)
+                   (declare (ignore val))
+                   (incf delta-score (%add-node mine node2)))
+                 (gethash node1 site->mines))
+        (maphash (lambda (mine val)
+                   (declare (ignore val))
+                   (incf delta-score (%add-node mine node1)))
+                 (gethash node2 site->mines))
+        ;; (graph:remove-edge graph node1 node2)
+        delta-score))))
+
