@@ -123,3 +123,9 @@
        (parse-stop-inner it))
       ((get-timeout json-ht)
        it))))
+
+(defun parse-map-from-file (map-file) 
+  (with-open-file (stream map-file)
+    (let ((contents (make-string (file-length stream))))
+      (read-sequence contents stream)
+      (parse-map contents))))
