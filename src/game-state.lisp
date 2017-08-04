@@ -24,6 +24,9 @@
    (mines :initarg :mines
           :reader mines
           :type list)
+   (sites :initarg :sites
+          :reader sites
+          :type list)
    (id :initarg :id
        :reader id
        :type integer)
@@ -35,20 +38,14 @@
    (distance-tab :accessor distance-tab)))
 
 (defun make-game-state (setup-message)
-  (let ((sites-number (map-sites (setup-map setup-message)))
-        (punters-number (setup-punters setup-message)))
-    (assert (integerp sites-number))
+  (let ((punters-number (setup-punters setup-message)))
     (make-instance
      'game
      :id (setup-punter setup-message)
      :players-number punters-number
-     :mines (mapcar (lambda (x)
-                      (assert (integerp x))
-                      (assert (< x sites-number))
-                      x)
-                    (map-mines (setup-map setup-message)))
-     :game-map (build-map (setup-map setup-message)
-                          sites-number))))
+     :mines (map-mines (setup-map setup-message))
+     :sites (map-sites (setup-map setup-message))
+     :game-map (build-map (setup-map setup-message)))))
 
 (defmethod initialize-instance :after ((state game) &key)
   (setf (distance-tab state)
@@ -59,12 +56,12 @@
          :initial-contents (loop :for id :from 0 :below (players-number state) :collect
                               (make-instance 'punter
                                              :id id
-                                             :graph (make-graph 'array-graph
-                                                                :num-nodes (num-nodes (game-map state)))
-                                             :mines (mines state))))))
+                                             :graph (make-graph 'hash-graph)
+                                             :mines (mines state)
+                                             :sites (sites state))))))
 
-(defun build-map (the-map num-nodes)
-  (let ((g (make-graph 'array-graph :num-nodes num-nodes)))
+(defun build-map (the-map)
+  (let ((g (make-graph 'hash-graph)))
     (dolist (river (map-rivers the-map))
       (let ((src (river-source river))
             (tgt (river-target river)))

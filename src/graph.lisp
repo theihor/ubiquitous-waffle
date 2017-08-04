@@ -11,12 +11,17 @@
            #:clone-graph
            
            #:array-graph
+           #:hash-graph
+           #:graph
            #:num-edges
            #:num-nodes))
 
 (in-package :src/graph)
 
-(defclass array-graph ()
+(defclass graph ()
+  ())
+
+(defclass array-graph (graph)
   ((num-nodes :initarg :num-nodes
               :reader num-nodes)
    (edges :initarg :edges)))
@@ -93,3 +98,61 @@ Nil when there is no neighbours."
        'array-graph
        :num-nodes num-nodes
        :edges arr))))
+
+
+;; Hash graph
+
+(defclass hash-graph (graph)
+  ((edges :initarg :edges)))
+
+(defun gethash-with-create (node tab)
+  (let ((res (gethash node tab)))
+    (if res
+        res
+        (let ((new (make-hash-table :test #'equal)))
+          (setf (gethash node tab) new)
+          new))))
+
+(defmethod add-edge ((graph hash-graph) node1 node2 data)
+  (with-slots (edges) graph
+    (let ((adj-tab1 (gethash-with-create node1 edges))
+          (adj-tab2 (gethash-with-create node2 edges)))
+      (setf (gethash node2 adj-tab1) data)
+      (setf (gethash node1 adj-tab2) data))))
+
+(defmethod get-edge ((graph hash-graph) node1 node2)
+  (with-slots (edges) graph
+    (let ((tab (gethash node1 edges)))
+      (when tab
+        (gethash node2 tab)))))
+
+(defmethod remove-edge ((graph hash-graph) node1 node2)
+  (with-slots (edges) graph
+    (let ((adj-tab1 (gethash node1 edges))
+          (adj-tab2 (gethash node2 edges)))
+      (when adj-tab1
+        (remhash node2 adj-tab1))
+      (when adj-tab2
+        (remhash node1 adj-tab2)))))
+
+(defmethod mapc-node-edges ((graph hash-graph) node func)
+  (with-slots (edges) graph
+    (let ((tab (gethash node edges)))
+      (when tab
+        (maphash func tab)))))
+
+(defmethod make-graph ((graph-class (eql 'hash-graph)) &rest params)
+  (declare (ignore params))
+  (make-instance 'hash-graph
+                 :edges (make-hash-table :test #'equal)))
+
+(defmethod clone-graph ((graph hash-graph))
+  (with-slots (edges) graph
+    (let ((tab (make-hash-table :test #'equal)))
+      (maphash (lambda (key value)
+                 (setf (gethash key tab)
+                       (alexandria:copy-hash-table value)))
+               edges)
+      (make-instance
+       'hash-graph
+       :edges tab))))
