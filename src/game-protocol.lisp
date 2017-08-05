@@ -25,6 +25,7 @@
            #:score-info
            #:score-info-punter
            #:score-info-score
+           #:settings
            #:future
            #:future-source
            #:future-target))

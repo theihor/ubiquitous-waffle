@@ -77,7 +77,8 @@
 (defun parse-settings-inner (settings-ht)
   (make-instance
    'settings
-   :futures (gethash "futures" settings-ht)))
+   :futures (when settings-ht
+              (gethash "futures" settings-ht))))
 
 (defun parse-setup-inner (setup-ht)
   (make-instance
