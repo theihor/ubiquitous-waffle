@@ -36,7 +36,8 @@
                    :type integer)
    (punters :initarg :punters
             :accessor punters)
-   (distance-tab :accessor distance-tab)))
+   (distance-tab :accessor distance-tab
+                 :documentation "Map (mine . target) -> distance")))
 
 (defun make-game-state (setup-message)
   (let ((punters-number (setup-punters setup-message)))
