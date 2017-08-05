@@ -1,10 +1,11 @@
 (defpackage :src/main
   (:nicknames :main)
   (:use :common-lisp :src/decode :src/encode 
-	:src/game-protocol
+        :src/game-protocol
         :src/game-player
         :src/punter
-        :src/game-state))
+        :src/game-state
+        :src/graph))
 
 (in-package :src/main)
 
@@ -110,7 +111,8 @@
 
   (let ((stdin *standard-input*)
         (stdout *standard-output*)
-        (player (make-player 'cowboy-player)))
+        (player (make-player 'connector-player))
+        (*package* (find-package :src/main)))
     
     (format *error-output* "Sending me...~%")
     
@@ -126,7 +128,7 @@
            (init-player player m)
            (format *error-output* "Sending ready...~%")
            ;; TODO: Futures should be in ready
-           (format-std "~A" (encode-ready (setup-punter m) :state (setup-punter m))))
+           (format-std "~A" (encode-ready (setup-punter m) :state player)))
           ((typep m 'stop)
            (progn
              (format *error-output* "Game stop.~%")
@@ -139,12 +141,10 @@
           ((typep (car m) 'move)
            (format *error-output* "Getting new moves...~%")
            (when state
-             ;; (setf player state)
-             ;; (update-player player m)
-             (let* ((new-move (make-instance 'pass :punter state)
-                     ;; (select-move player)
-                      )
-                    (dummy (setf (move-state new-move) state))
+             (setf player state)
+             (update-player player m)
+             (let* ((new-move (select-move player))
+                    (dummy (setf (move-state new-move) player))
                     (encoded-move (encode-move new-move)))
                (format *error-output* "Sending move... ~A~%" encoded-move)
                (format-std "~A" encoded-move)))
