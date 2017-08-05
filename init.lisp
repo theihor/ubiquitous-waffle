@@ -36,6 +36,8 @@
 (ql:quickload 'cl-ppcre)
 (ql:quickload 'cl-mop)
 
+(ql:quickload :cl-rl)
+
 (in-package :cl-user)
 (asdf:initialize-source-registry '(:source-registry
                                    :inherit-configuration
