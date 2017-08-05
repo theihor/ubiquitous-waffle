@@ -106,8 +106,8 @@
       (let ((type (gethash "__type" ht)))
         (cond
           ((string= type "HASH-TABLE")
-           (total-parse-inner
-            (alexandria:plist-hash-table (gethash "content" ht))))
+           (alexandria:plist-hash-table
+            (mapcar #'total-parse-inner (gethash "content" ht))))
           ((string= type "PAIR")
            (cons (gethash "car" (total-parse-inner ht))
                  (gethash "cdr" (total-parse-inner ht))))
