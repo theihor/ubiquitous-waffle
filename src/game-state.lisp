@@ -13,7 +13,9 @@
            #:mapc-claims
            #:punters
            #:distance-tab
-           #:dump-state))
+           #:dump-state
+           #:game
+           #:game-with-scores))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -34,14 +36,16 @@
    (players-number :initarg :players-number
                    :reader players-number
                    :type integer)
-   (punters :initarg :punters
-            :accessor punters)
-   (distance-tab :accessor distance-tab)))
+   (distance-tab :accessor distance-tab
+                 :documentation "Map (mine . target) -> distance")))
 
-(defun make-game-state (setup-message)
+(defgeneric process-moves (state moves))
+(defgeneric dump-state (state moves))
+
+(defun make-game-state (setup-message &key (type 'game))
   (let ((punters-number (setup-punters setup-message)))
     (make-instance
-     'game
+     type
      :id (setup-punter setup-message)
      :players-number punters-number
      :mines (map-mines (setup-map setup-message))
@@ -50,16 +54,7 @@
 
 (defmethod initialize-instance :after ((state game) &key)
   (setf (distance-tab state)
-        (bfs:multiple-bfs-distances (game-map state) (mines state)))
-  (setf (punters state)
-        (make-array
-         (list (players-number state))
-         :initial-contents (loop :for id :from 0 :below (players-number state) :collect
-                              (make-instance 'punter
-                                             :id id
-                                             :graph (make-graph 'hash-graph)
-                                             :mines (mines state)
-                                             :sites (sites state))))))
+        (bfs:multiple-bfs-distances (game-map state) (mines state))))
 
 (defun build-map (the-map)
   (let ((g (make-graph 'hash-graph)))
@@ -84,7 +79,32 @@
          (assert (integerp tgt))
          (funcall func id src tgt))))))
 
-(defun process-moves (state moves)
+(defmethod process-moves ((state game) moves)
+  (let ((the-map (game-map state)))
+    (mapc-claims
+     moves
+     (lambda (id src tgt)
+       (assert (eq (get-edge the-map src tgt) :free))
+       (add-edge the-map src tgt id)))))
+
+(defclass game-with-scores (game)
+  ((punters :initarg :punters
+            :accessor punters)))
+
+(defmethod initialize-instance :after ((state game-with-scores) &key)
+  (setf (distance-tab state)
+        (bfs:multiple-bfs-distances (game-map state) (mines state)))
+  (setf (punters state)
+        (make-array
+         (list (players-number state))
+         :initial-contents (loop :for id :from 0 :below (players-number state) :collect
+                              (make-instance 'punter
+                                             :id id
+                                             :graph (make-graph 'hash-graph)
+                                             :mines (mines state)
+                                             :sites (sites state))))))
+
+(defmethod process-moves ((state game-with-scores) moves)
   (let ((the-map (game-map state)))
     (mapc-claims
      moves
@@ -92,7 +112,7 @@
        (assert (eq (get-edge the-map src tgt) :free))
        (claim-edge (elt (punters state) id) src tgt (distance-tab state))
        (add-edge the-map src tgt id)))))
-
+  
 (defun dump-graph-with-distances (state file)
   (let ((rev-dist (make-hash-table :test #'equal)))
     (maphash (lambda (mine-node d)
@@ -117,7 +137,7 @@
     chocolate 	chocolate1 	
     coral 	 	coral4))
 
-(defun dump-state (state file)
+(defmethod dump-state ((state game-with-scores) file)
   (with-open-file (s file
                      :direction :output
                      :if-exists :supersede
@@ -131,9 +151,8 @@
                          (lambda (target data)
                            (declare (ignore data))
                            (when (< source target)
-                             (format s "~A -- ~A [color=~A,label=\"~A\"];~%"
-                                     source target color
-                                     )))
+                             (format s "~A -- ~A [color=~A];~%"
+                                     source target color)))
                          targets))
                       (graph-edges (punter-graph p)))))
     (format s "}~%")))

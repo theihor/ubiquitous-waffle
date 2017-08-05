@@ -1,10 +1,11 @@
 (defpackage :src/main
   (:nicknames :main)
   (:use :common-lisp :src/decode :src/encode 
-	:src/game-protocol
+        :src/game-protocol
         :src/game-player
         :src/punter
-        :src/game-state))
+        :src/game-state
+        :src/graph))
 
 (in-package :src/main)
 
@@ -23,7 +24,7 @@
 	(let ((socket (make-instance 'sb-bsd-sockets:inet-socket :type  :stream :protocol :tcp)))
 	  (sb-bsd-sockets:socket-connect socket (nslookup server) port)
 	  socket)
-      (host-not-found-error ()
+      (sb-bsd-sockets:host-not-found-error ()
 	(format t "Host ~A not found." server)
 	(force-output)
 	nil))))
@@ -80,27 +81,86 @@
 		  (format t "~A~%" move-or-stop-or-timeout)
 		  (cond
 		    ((typep m 'stop)
-		      (progn
-			(format t "Game stop.~%")
-                        (format t "Computed score:~%")
-                        (loop :for punter :below (players-number (state player))
-                           :do (format t "~A :~A~%"
-                                       punter
-                                       (score (elt (punters (state player)) punter))))
-			(return)))
+             (progn
+               (format t "Game stop.~%")
+               (when (typep (state player) 'game-with-scores)
+                 (format t "Computed score:~%")
+                 (loop :for punter :below (players-number (state player))
+                    :do (format t "~A :~A~%"
+                                punter
+                                (score (elt (punters (state player)) punter)))))
+               (return)))
 		    ((typep (car m) 'move)
 		     (progn
 			(update-player player m)
 			(let ((new-move (select-move player)))
-			  (tcp-send socket (encode-move new-move)))))
+			  (tcp-send socket (encode-move new-move))
+              (setf (move-state new-move) player)
+              (format t "Encoded move: ~A~%" (encode-move new-move)))))
 		    (t (format t "Timeout.~%")))))))
       ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
+(defun format-std (str &rest params)
+  (apply #'format *standard-output* str params)
+  (finish-output *standard-output*))
+
+(defparameter *do-logging* nil)
+
+(defun debug-log (str &rest params)
+  (when *do-logging*
+    (format *error-output* str params)))
+
 ;; via stdin, stdout, stderr
 (defun main-offline ()
-  (print "Offline"))
+
+  (let ((stdin *standard-input*)
+        ;; (stdout *standard-output*)
+        (player (make-player 'connector-player))
+        (*package* (find-package :src/main)))
+    
+    (debug-log "Sending me...~%")
+    
+    (format-std "~A" (encode-me "SpiritRaccoons"))
+    (debug-log "Getting you... ~A~%" (read-with-size stdin))
+    
+    (let ((msg (read-with-size stdin)))
+      (debug-log "From server: ~A~%" msg)
+      (multiple-value-bind (m state) (parse msg)
+        (cond 
+          ((typep m 'setup)
+           (debug-log "Init new player.~%")
+           (init-player player m)
+           (debug-log "Sending ready...~%")
+           ;; TODO: Futures should be in ready
+           (format-std "~A" (encode-ready (setup-punter m) :state player)))
+          ((typep m 'stop)
+           (progn
+             (debug-log "Game stop.~%")
+             (when (typep (state player) 'game-with-scores)
+               (debug-log "Computed score:~%")
+               (loop :for punter :below (players-number (state player))
+                  :do (debug-log "~A :~A~%"
+                              punter
+                              (score (elt (punters (state player)) punter)))))))
+          ((typep (car m) 'move)
+           (debug-log "Getting new moves...~%")
+           (when state
+             (setf player state)
+             (update-player player m)
+             (debug-log "Player updated...~%")
+             (let* ((new-move (select-move player))
+                    (dummy (setf (move-state new-move) player))
+                    (dummy2 (debug-log "Move selected...~%"))
+                    (encoded-move (encode-move new-move)))
+               (declare (ignorable dummy dummy2))
+               (debug-log "Sending move... ~A~%" encoded-move)
+               (format-std "~A" encoded-move)))
+           )
+          (t (debug-log "Timeout.~%")))))
+    )
+  )
 
 ;; (defun main ()
 ;;   (when sb-ext:*posix-argv*
@@ -127,7 +187,7 @@
 ;; 	(dolist (f (reverse files))			
 ;; 	  (when (probe-file f)
 ;; 	    ;;(format t "~A~%~%" (alexandria:read-file-into-string f))
-;;             (format *error-output* "Processing file ~A~%" f)
+;;             (debug-log "Processing file ~A~%" f)
 ;; 	    (setf result-list 
 ;; 		  (append result-list (let ((*standard-output* *error-output*))
 ;;                                         (simple-wave-from-task 

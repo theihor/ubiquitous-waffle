@@ -33,8 +33,8 @@
 ;; (ql:quickload 'stmx)
 ;; (ql:quickload 'hyperluminal-mem)
 ;; (ql:quickload 'trivial-timeout)
-
 (ql:quickload 'cl-ppcre)
+(ql:quickload 'cl-mop)
 
 (in-package :cl-user)
 (asdf:initialize-source-registry '(:source-registry

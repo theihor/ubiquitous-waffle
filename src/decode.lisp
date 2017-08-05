@@ -5,7 +5,8 @@
            #:parse-setup
            #:parse-moves
            #:parse-stop
-           #:parse-map))
+           #:parse-map
+           #:total-parse))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -74,12 +75,19 @@
        (gethash "punters" msg-ht)
        (gethash "map" msg-ht)))
 
+(defun parse-settings-inner (settings-ht)
+  (make-instance
+   'settings
+   :futures (when settings-ht
+              (gethash "futures" settings-ht))))
+
 (defun parse-setup-inner (setup-ht)
   (make-instance
    'setup
    :punter (gethash "punter" setup-ht)
    :punters (gethash "punters" setup-ht)
-   :map (parse-map-inner (gethash "map" setup-ht))))
+   :map (parse-map-inner (gethash "map" setup-ht))
+   :settings (parse-settings-inner (gethash "settings" setup-ht))))
 
 (defun get-move (msg-ht)
   (gethash "move" msg-ht))
@@ -92,6 +100,38 @@
 
 (defun parse-state (msg-ht)
   msg-ht)
+
+(defun total-parse-inner (ht)
+  (if (typep ht 'HASH-TABLE)
+      (let ((type (gethash "__type" ht)))
+        (cond
+          ((string= type "HASH-TABLE")
+           (alexandria:plist-hash-table
+            (mapcar #'total-parse-inner (gethash "content" ht))))
+          ((string= type "PAIR")
+           (cons (total-parse-inner (gethash "car" ht))
+                 (total-parse-inner (gethash "cdr" ht))))
+          ((string= type "KEYWORD")
+           (intern (gethash "value" ht) :keyword))
+          ((string= type "SYM")
+           (let ((str (gethash "value" ht))) 
+             (when str
+               (if (string= str "NIL")
+                   nil
+                   (intern str)))))
+          (t
+           (when type
+             (let ((instance (allocate-instance (find-class (intern type)))))
+               (dolist (slot (cl-mop:slot-names instance) instance)
+                 (setf
+                  (slot-value instance slot)
+                  (total-parse-inner (gethash (symbol-name slot) ht)))))))))
+      (if (and (stringp ht)
+               (> (length ht) 0))
+          (cond ((eq (elt ht 0) #\:) (intern (subseq ht 1) :keyword))
+                ((eq (elt ht 0) #\#) (intern (subseq ht 1)))
+                (t ht))
+          ht)))
 
 
 (defun parse-you (msg)
@@ -127,10 +167,14 @@
         (parse-stop-inner it))
        ((get-timeout json-ht)
         it))
-     (parse-state (gethash "state" json-ht)))))
+     (total-parse-inner (gethash "state" json-ht)))))
 
 (defun parse-map-from-file (map-file) 
   (with-open-file (stream map-file)
     (let ((contents (make-string (file-length stream))))
       (read-sequence contents stream)
       (parse-map contents))))
+
+(defun total-parse (json)
+  (let ((json-ht (yason:parse json)))
+    (total-parse-inner json-ht)))
