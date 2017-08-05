@@ -106,6 +106,12 @@
   (apply #'format *standard-output* str params)
   (finish-output *standard-output*))
 
+(defparameter *do-logging* nil)
+
+(defun debug-log (str &rest params)
+  (when *do-logging*
+    (format *error-output* str params)))
+
 ;; via stdin, stdout, stderr
 (defun main-offline ()
 
@@ -114,42 +120,42 @@
         (player (make-player 'connector-player))
         (*package* (find-package :src/main)))
     
-    (format *error-output* "Sending me...~%")
+    (debug-log "Sending me...~%")
     
     (format-std "~A" (encode-me "SpiritRaccoons"))
-    (format *error-output* "Getting you... ~A~%" (read-with-size stdin))
+    (debug-log "Getting you... ~A~%" (read-with-size stdin))
     
     (let ((msg (read-with-size stdin)))
-      (format *error-output* "From server: ~A~%" msg)
+      (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
         (cond 
           ((typep m 'setup)
-           (format *error-output* "Init new player.~%")
+           (debug-log "Init new player.~%")
            (init-player player m)
-           (format *error-output* "Sending ready...~%")
+           (debug-log "Sending ready...~%")
            ;; TODO: Futures should be in ready
            (format-std "~A" (encode-ready (setup-punter m) :state player)))
           ((typep m 'stop)
            (progn
-             (format *error-output* "Game stop.~%")
+             (debug-log "Game stop.~%")
              (when (typep (state player) 'game-with-scores)
-               (format *error-output* "Computed score:~%")
+               (debug-log "Computed score:~%")
                (loop :for punter :below (players-number (state player))
-                  :do (format *error-output* "~A :~A~%"
+                  :do (debug-log "~A :~A~%"
                               punter
                               (score (elt (punters (state player)) punter)))))))
           ((typep (car m) 'move)
-           (format *error-output* "Getting new moves...~%")
+           (debug-log "Getting new moves...~%")
            (when state
              (setf player state)
              (update-player player m)
              (let* ((new-move (select-move player))
                     (dummy (setf (move-state new-move) player))
                     (encoded-move (encode-move new-move)))
-               (format *error-output* "Sending move... ~A~%" encoded-move)
+               (debug-log "Sending move... ~A~%" encoded-move)
                (format-std "~A" encoded-move)))
            )
-          (t (format *error-output* "Timeout.~%")))))
+          (t (debug-log "Timeout.~%")))))
     )
   )
 
@@ -178,7 +184,7 @@
 ;; 	(dolist (f (reverse files))			
 ;; 	  (when (probe-file f)
 ;; 	    ;;(format t "~A~%~%" (alexandria:read-file-into-string f))
-;;             (format *error-output* "Processing file ~A~%" f)
+;;             (debug-log "Processing file ~A~%" f)
 ;; 	    (setf result-list 
 ;; 		  (append result-list (let ((*standard-output* *error-output*))
 ;;                                         (simple-wave-from-task 
