@@ -10,6 +10,7 @@
                :src/game-player
                :src/decode
                :src/mcts
+               :src/simulator
                )
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)

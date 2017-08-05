@@ -18,6 +18,7 @@
 ;; (ql:quickload 'babel)
 ;; (ql:quickload 'cl-svg)
 (ql:quickload 'yason)
+(ql:quickload 'drakma)
 ;; (ql:quickload 'cl-geometry)
 ;; (ql:quickload 'smug)
 (ql:quickload 'anaphora)
