@@ -4,6 +4,7 @@
            #:setup-punter
            #:setup-punters
            #:setup-map
+           #:setup-settings
            #:game-map
            #:map-sites
            #:map-rivers
@@ -24,7 +25,9 @@
            #:score-info
            #:score-info-punter
            #:score-info-score
-           ))
+           #:future
+           #:future-source
+           #:future-target))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -34,7 +37,15 @@
 (defclass setup ()
   ((punter :initarg :punter :accessor setup-punter)
    (punters :initarg :punters :accessor setup-punters)
-   (setup-map :initarg :map :accessor setup-map)))
+   (setup-map :initarg :map :accessor setup-map)
+   (setting :initarg :settings :accessor setup-settings :initform nil)))
+
+(defclass settings ()
+  ((futures :initarg :futures :accessor settings-futures)))
+
+(defclass future ()
+  ((source :initarg :source :accessor future-source)
+   (target :initarg :target :accessor future-target)))
 
 (defclass game-map ()
   ((sites :initarg :sites :accessor map-sites)

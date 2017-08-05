@@ -28,6 +28,12 @@
       (awhen (move-state obj)
         (yason:encode-object-element "state" it)))))
 
+(defmethod yason:encode ((obj future) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:encode-object-element "source" (future-source obj))
+      (yason:encode-object-element "target" (future-target obj)))))
+
 (defun encode-msg (json-msg)
   (format nil "~a:~a" (length json-msg) json-msg))
 
@@ -39,12 +45,14 @@
        (yason:with-object ()
          (yason:encode-object-element "me" name))))))
 
-(defun encode-ready (punter-id &key state)
+(defun encode-ready (punter-id &key futures state)
   (encode-msg
    (with-output-to-string (stream)
      (yason:with-output (stream)
        (yason:with-object ()
          (yason:encode-object-element "ready" punter-id)
+         (when futures
+           (yason:encode-object-element "futures" futures))
          (when state
            (yason:encode-object-element "state" state)))))))
 

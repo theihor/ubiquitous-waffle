@@ -74,12 +74,18 @@
        (gethash "punters" msg-ht)
        (gethash "map" msg-ht)))
 
+(defun parse-settings-inner (settings-ht)
+  (make-instance
+   'settings
+   :futures (gethash "futures" settings-ht)))
+
 (defun parse-setup-inner (setup-ht)
   (make-instance
    'setup
    :punter (gethash "punter" setup-ht)
    :punters (gethash "punters" setup-ht)
-   :map (parse-map-inner (gethash "map" setup-ht))))
+   :map (parse-map-inner (gethash "map" setup-ht))
+   :settings (parse-settings-inner (gethash "settings" setup-ht))))
 
 (defun get-move (msg-ht)
   (gethash "move" msg-ht))
