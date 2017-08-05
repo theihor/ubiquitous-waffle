@@ -2,7 +2,8 @@
   (:use :common-lisp :src/graph)
   (:export #:punter
            #:claim-edge
-           #:score))
+           #:score
+           #:punter-graph))
 
 (in-package :src/punter)
 

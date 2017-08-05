@@ -3,12 +3,14 @@
           :src/game-protocol
           :src/graph
           :src/game-state)
+  (:import-from :alexandria)
   (:export
    #:make-player
    #:init-player
    #:update-player
    #:select-move
    #:cowboy-player
+   #:connector-player
    #:state))
 
 (declaim (optimize (debug 3) (safety 3)))
@@ -59,6 +61,15 @@
        (declare (ignore id))
        (remove-edge avail-graph src trgt)))))
 
+(defun make-claim (state src trgt)
+  (make-instance 'claim
+                 :source src
+                 :target trgt
+                 :punter (id state)))
+
+(defun make-pass (state)
+  (make-instance 'pass :punter (id state)))
+
 (defmethod select-move ((player cowboy-player))
   (with-slots (avail-list avail-tab avail-graph state) player
     (labels ((%find-avail (list tab)
@@ -82,8 +93,96 @@
         (if node
             (let ((new-avail-list-2 (%add-new-avail move-to new-avail-list avail-tab)))
               (setf avail-list new-avail-list-2)
-              (make-instance 'claim
-                             :source node
-                             :target move-to
-                             :punter (id state)))
-            (make-instance 'pass :punter (id state)))))))
+              (make-claim state node move-to))
+            (make-pass state))))))
+
+;; Connector player
+
+(defclass connector-player (game-player)
+  ((avail-graph :accessor avail-graph
+                :initform nil)
+   (current-network :accessor current-network
+                    :initform nil)
+   (mines :accessor mines
+          :initform nil)))
+
+(defun find-connecting-move (graph current-network target)
+  (if (gethash target current-network)
+      t
+      (let ((nodes (alexandria:hash-table-keys current-network))
+            (prev (alexandria:copy-hash-table current-network)))
+        (labels ((%bfs (nodes)
+                   (let ((new-nodes nil))
+                     (loop :for node :in nodes
+                        :do (mapc-node-edges
+                             graph node
+                             (lambda (neighbour data)
+                               (declare (ignore data))
+                               (unless (gethash neighbour prev)
+                                 (setf (gethash neighbour prev)
+                                       node)
+                                 (push neighbour new-nodes)
+                                 (when (= neighbour target)
+                                   (return-from %bfs t))))))
+                     (when new-nodes
+                       (%bfs new-nodes))))
+                 (%move-from (node prev-node)
+                   (let ((node1 (gethash node prev)))
+                     (if (eq node1 t)
+                         (values node prev-node)
+                         (%move-from node1 node)))))
+          (if (%bfs nodes)
+              (%move-from target (gethash target prev))
+              nil)))))
+
+(defmethod make-player ((player-class (eql 'connector-player)) &rest params)
+  (declare (ignore params))
+  (make-instance 'connector-player))
+
+(defmethod init-player :after ((player connector-player) setup-message)
+  (with-slots (avail-graph state current-network mines) player
+    (setf avail-graph (clone-graph (game-map state)))
+    (setf current-network (make-hash-table :test #'equal))
+    (setf mines (mines state))))
+
+(defmethod update-player :after ((player connector-player) moves)
+  (with-slots (current-network avail-graph state) player
+    (mapc-claims
+     moves
+     (lambda (id src trgt)
+       (remove-edge avail-graph src trgt)
+       (when (= id (id state))
+         (setf (gethash src current-network) t)
+         (setf (gethash trgt current-network) t))))))
+
+(defmethod select-move ((player connector-player))
+  (with-slots (avail-graph current-network mines state) player
+    (labels ((%do-move ()
+               (if mines
+                   (let ((next-mine (car mines)))
+                     (multiple-value-bind (src trgt)
+                         (find-connecting-move avail-graph current-network next-mine)
+                       (cond ((or (eq src t)
+                                  (eq src nil))
+                              (pop mines)
+                              (%do-move))
+                             (t (make-claim state src trgt)))))
+                   (%do-random-move)))
+             (%do-random-move ()
+               (maphash (lambda (node val)
+                          (declare (ignore val))
+                          (let ((neighbour (any-neighbour avail-graph node)))
+                            (when neighbour
+                              (return-from %do-random-move
+                                (make-claim state node neighbour)))))
+                        current-network)
+               (%do-totally-random-move))
+             (%do-totally-random-move ()
+               (let ((node (any-node avail-graph)))
+                 (if node
+                     (make-claim state node (any-neighbour avail-graph node))
+                     (make-pass state)))))
+      (when (= (hash-table-count current-network) 0)
+        (let ((first-mine (pop mines)))
+          (setf (gethash first-mine current-network) t)))
+      (%do-move))))
