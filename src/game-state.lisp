@@ -13,7 +13,9 @@
            #:mapc-claims
            #:punters
            #:distance-tab
-           #:dump-state))
+           #:dump-state
+           #:game
+           #:game-with-scores))
 
 (declaim (optimize (debug 3) (safety 3)))
 

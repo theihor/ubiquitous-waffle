@@ -66,7 +66,8 @@
   (let ((player (apply #'make-player player-params)))
     (labels ((%run ()
                (let ((move (select-move player)))
-                 (format t "Score: ~A~%" (score (elt (punters (state player)) 0)))
+                 (when (typep (state player) 'game-with-scores)
+                     (format t "Score: ~A~%" (score (elt (punters (state player)) 0))))
                  (format t "Move : ~A~%" (encode-move move))
                  (if (typep move 'pass)
                      nil
