@@ -3,6 +3,7 @@
   (:use :common-lisp :src/decode :src/encode 
         :src/game-protocol
         :src/game-player
+        :src/future-player
         :src/punter
         :src/game-state
         :src/graph
@@ -95,11 +96,12 @@
              (game-logger-setup setup-ht)
 	     (init-player player s)
 
-	     ;;TODO: Add futures handling
-
 	     ;; send ready
 	     (format t "Sending ready...~%")
-	     (tcp-send socket (encode-ready (setup-punter s)))
+	     (tcp-send
+              socket
+              (encode-ready (setup-punter s)
+                            :futures (bid-on-futures player s)))
 	     ;; loop for moves until stop
 	     (loop
 		;; get move
