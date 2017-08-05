@@ -9,6 +9,7 @@
            #:mapc-node-edges
            #:any-neighbour
            #:clone-graph
+           #:any-node
            
            #:array-graph
            #:hash-graph
@@ -41,7 +42,8 @@
   (:documentation "Make a copy of the graph"))
 (defgeneric graph->dot (graph file &key edge-label node-label)
   (:documentation "Dump graph to file in dot format"))
-
+(defgeneric any-node (graph)
+  (:documentation "Return any node of the graph that has edges"))
 
 (defun check-nodes (graph &rest node-nums)
   (with-slots (num-nodes) graph
@@ -135,15 +137,27 @@ Nil when there is no neighbours."
     (let ((adj-tab1 (gethash node1 edges))
           (adj-tab2 (gethash node2 edges)))
       (when adj-tab1
-        (remhash node2 adj-tab1))
+        (remhash node2 adj-tab1)
+        (when (= (hash-table-count adj-tab1) 0)
+          (remhash node1 edges)))
       (when adj-tab2
-        (remhash node1 adj-tab2)))))
+        (remhash node1 adj-tab2)
+        (when (= (hash-table-count adj-tab2) 0)
+          (remhash node2 edges))))))
 
 (defmethod mapc-node-edges ((graph hash-graph) node func)
   (with-slots (edges) graph
     (let ((tab (gethash node edges)))
       (when tab
         (maphash func tab)))))
+
+(defmethod any-node ((graph hash-graph))
+  (with-slots (edges) graph
+    (maphash (lambda (node connections)
+               (declare (ignore connections))
+               (return-from any-node node))
+             edges))
+  nil)
 
 (defmethod make-graph ((graph-class (eql 'hash-graph)) &rest params)
   (declare (ignore params))

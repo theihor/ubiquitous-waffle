@@ -13,6 +13,7 @@
            #:river-target
            #:move
            #:move-punter
+           #:move-state
            #:claim
            #:claim-source
            #:claim-target
@@ -46,7 +47,8 @@
 
 ;;; move
 (defclass move ()
-  ((punter :initarg :punter :accessor move-punter)))
+  ((punter :initarg :punter :accessor move-punter)
+   (state :initarg :state :accessor move-state :initform nil)))
 
 (defclass claim (move)
   ((source :initarg :source :accessor claim-source)

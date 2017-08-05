@@ -90,6 +90,9 @@
 (defun get-timeout (msg-ht)
   (gethash "timeout" msg-ht))
 
+(defun parse-state (msg-ht)
+  msg-ht)
+
 
 (defun parse-you (msg)
   (let ((you-ht (yason:parse msg)))
@@ -112,17 +115,19 @@
 
 (defun parse (json)
   (let ((json-ht (yason:parse json)))
-    (acond
-      ((get-handshake json-ht)
-       it)
-      ((setup-p json-ht)
-       (parse-setup-inner json-ht))
-      ((get-move json-ht)
-       (parse-moves-inner it))
-      ((get-stop json-ht)
-       (parse-stop-inner it))
-      ((get-timeout json-ht)
-       it))))
+    (values
+     (acond
+       ((get-handshake json-ht)
+        it)
+       ((setup-p json-ht)
+        (parse-setup-inner json-ht))
+       ((get-move json-ht)
+        (parse-moves-inner it))
+       ((get-stop json-ht)
+        (parse-stop-inner it))
+       ((get-timeout json-ht)
+        it))
+     (parse-state (gethash "state" json-ht)))))
 
 (defun parse-map-from-file (map-file) 
   (with-open-file (stream map-file)
