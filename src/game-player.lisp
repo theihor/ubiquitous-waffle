@@ -13,7 +13,7 @@
    #:connector-player
    #:state))
 
-(declaim (optimize (debug 3) (safety 3)))
+(declaim (optimize (debug 0) (safety 0) (speed 3)))
 
 (in-package :src/game-player)
 
