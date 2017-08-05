@@ -94,6 +94,7 @@
 			(let ((new-move (select-move player)))
 			  (tcp-send socket (encode-move new-move)))))
 		    (t (format t "Timeout.~%")))))))
+      ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
