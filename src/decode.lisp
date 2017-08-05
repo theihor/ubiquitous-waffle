@@ -101,16 +101,27 @@
 (defun parse-state (msg-ht)
   msg-ht)
 
-;; (defun total-parse-inner (ht)
-;;   (flet ((%slot-name (slot)
-;;            (first slot)))
-;;    (aif (gethash "__type" ht)
-;;         (let ((instance (make-instance (intern it))))
-;;           (dolist (slot  instance)
-;;             (setf
-;;              (intern (string-upcase (cl-mop:slot-name instance (%slot-name slot))))
-;;              (gethash (%slot-name slot) ht))))
-;;         ht)))
+(defun total-parse-inner (ht)
+  (if (typep ht 'HASH-TABLE)
+      (let ((type (gethash "__type" ht)))
+        (cond
+          ((string= type "HASH-TABLE")
+           (total-parse-inner
+            (alexandria:plist-hash-table (gethash "content" ht))))
+          ((string= type "PAIR")
+           (cons (gethash "car" (total-parse-inner ht))
+                 (gethash "cdr" (total-parse-inner ht))))
+          ((string= type "KEYWORD")
+           (intern (gethash "value" ht) :keyword))
+          ((string= type "SYM")
+           (intern (gethash "value" ht)))
+          (t
+           (let ((instance (make-instance (intern type))))
+             (dolist (slot (cl-mop:slot-names instance) instance)
+               (setf
+                (slot-value instance slot)
+                (total-parse-inner (gethash (symbol-name slot) ht))))))))
+      ht))
 
 
 (defun parse-you (msg)
@@ -154,6 +165,6 @@
       (read-sequence contents stream)
       (parse-map contents))))
 
-;; (defun total-parse (json)
-;;   (let ((json-ht (yason:parse json)))
-;;     (total-parse-inner json-ht)))
+(defun total-parse (json)
+  (let ((json-ht (yason:parse json)))
+    (total-parse-inner json-ht)))
