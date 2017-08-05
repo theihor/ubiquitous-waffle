@@ -16,7 +16,8 @@
            #:graph
            #:num-edges
            #:num-nodes
-           #:graph-edges))
+           #:graph-edges
+           #:mapc-all-edges))
 
 (in-package :src/graph)
 
@@ -44,6 +45,8 @@
   (:documentation "Dump graph to file in dot format"))
 (defgeneric any-node (graph)
   (:documentation "Return any node of the graph that has edges"))
+(defgeneric mapc-all-edges (graph func)
+  (:documentation "Maps all edges of graph with params (source target data)"))
 
 (defun check-nodes (graph &rest node-nums)
   (with-slots (num-nodes) graph
@@ -150,6 +153,14 @@ Nil when there is no neighbours."
     (let ((tab (gethash node edges)))
       (when tab
         (maphash func tab)))))
+
+(defmethod mapc-all-edges ((graph hash-graph) func)
+  (maphash (lambda (source targets)
+             (maphash (lambda (target data)
+                        (when (< source target)
+                          (funcall func source target data)))
+                      targets))
+           (graph-edges graph)))
 
 (defmethod any-node ((graph hash-graph))
   (with-slots (edges) graph

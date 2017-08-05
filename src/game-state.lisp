@@ -15,7 +15,8 @@
            #:distance-tab
            #:dump-state
            #:game
-           #:game-with-scores))
+           #:game-with-scores
+           #:score))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -112,7 +113,10 @@
        (assert (eq (get-edge the-map src tgt) :free))
        (claim-edge (elt (punters state) id) src tgt (distance-tab state))
        (add-edge the-map src tgt id)))))
-  
+
+(defmethod score ((state game-with-scores))
+  (score (elt (punters state) (id state))))
+
 (defun dump-graph-with-distances (state file)
   (let ((rev-dist (make-hash-table :test #'equal)))
     (maphash (lambda (mine-node d)

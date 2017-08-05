@@ -11,7 +11,8 @@
    #:select-move
    #:cowboy-player
    #:connector-player
-   #:state))
+   #:state
+   #:make-claim))
 
 (declaim (optimize (debug 0) (safety 0) (speed 3)))
 
