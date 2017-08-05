@@ -107,35 +107,36 @@
     (format *error-output* "Sending me...")
     (format stdout "~A" (encode-me "SpiritRaccoons"))
     (format *error-output* "Getting you... ~A" (read-with-size stdin))
-    (let* ((msg (read-with-size stdin))
-	   (m (parse msg)))
+    (let ((msg (read-with-size stdin)))
       (format *error-output* "From server: ~A~%" msg)
-      (cond 
-	((typep m 'setup)
-	 (format *error-output* "Init new player.")
-	 (init-player player m)
-	 ;; TODO: Futures
-	 (format *error-output* "Sending ready...")
-	 ;;(format stdout "~A" (encode-ready (setup-punter m) player))
-	 )
-	((typep m 'stop)
-	 (progn
-	   (format *error-output* "Game stop.~%")
-	   (format *error-output* "Computed score:~%")
-	   (loop :for punter :below (players-number (state player))
-	      :do (format *error-output* "~A :~A~%"
-			  punter
-			  (score (elt (punters (state player)) punter))))))
-	((typep (car m) 'move)
-	 (format *error-output* "Getting new moves...")
-	 ;;(setf player ) ;;state from m
-	 ;;(update-player player) ;;list of moves from m
-	 (let* ((new-move (select-move player))
-		(encoded-move (encode-move new-move)))
-	   (format *error-output* "Sending move... ~A~%" encoded-move)
-	   ;;(format stdout "~A" (encode-move new-move))
-	   ))
-	(t (format *error-output* "Timeout.~%"))))))
+      (multiple-value-bind (m state) (parse msg)
+	(cond 
+	  ((typep m 'setup)
+	   (format *error-output* "Init new player.")
+	   (init-player player m)
+	   (format *error-output* "Sending ready...")
+	   ;; TODO: Futures should be in ready
+	   (format stdout "~A" (encode-ready (setup-punter m) :state player)))
+	  ((typep m 'stop)
+	   (progn
+	     (format *error-output* "Game stop.~%")
+	     (when (typep (state player) 'game-with-scores)
+	       (format *error-output* "Computed score:~%")
+	       (loop :for punter :below (players-number (state player))
+		  :do (format *error-output* "~A :~A~%"
+			      punter
+			      (score (elt (punters (state player)) punter)))))))
+	  ((typep (car m) 'move)
+	   (format *error-output* "Getting new moves...")
+	   (when state
+	     (setf player state)
+	     (update-player player m)
+	     (let* ((new-move (select-move player))
+		    (dummy (setf (move-state new-move) player))
+		    (encoded-move (encode-move new-move)))
+	       (format *error-output* "Sending move... ~A~%" encoded-move)
+	       (format stdout "~A" encoded-move))))
+	  (t (format *error-output* "Timeout.~%")))))))
 
 ;; (defun main ()
 ;;   (when sb-ext:*posix-argv*
