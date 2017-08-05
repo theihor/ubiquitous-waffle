@@ -34,6 +34,8 @@
 ;; (ql:quickload 'hyperluminal-mem)
 ;; (ql:quickload 'trivial-timeout)
 
+(ql:quickload 'cl-ppcre)
+
 (in-package :cl-user)
 (asdf:initialize-source-registry '(:source-registry
                                    :inherit-configuration

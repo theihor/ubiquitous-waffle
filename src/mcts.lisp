@@ -7,14 +7,20 @@
            #:possible-actions
            #:next-state
            #:clone-state
-           #:estimate-state-rewards))
+           #:show-state
+           #:estimate-state-rewards
+           #:print-decision-tree)
+  (:import-from :cl-ppcre))
 
 (in-package :src/mcts)
 
 (defvar *exploration-coefficient*)
 (defvar *max-selection-depth*)
 (defvar *players-number*)
+(defvar *node-dot-ids*)
+(defvar *node-dot-ids-counter*)
 
+;; TODO: what about state sharing?
 (defclass node ()
   ((parent :reader parent
            :initarg :parent
@@ -55,8 +61,17 @@
 (defgeneric clone-state (state)
   (:documentation "return copy of the state that could be modified locally"))
 
-(defgeneric estimate-state-rewards (state)
+(defgeneric estimate-state-rewards (state player)
   (:documentation "return vector of reward values one per each player"))
+
+(defgeneric show-state (state)
+  (:documentation "convert state to string for debugging purpose"))
+
+(defgeneric show-action (action)
+  (:documentation "convert action to string for debugging purpose"))
+
+(defmethod show-action ((a t))
+  (format nil "~A" a))
 
 (defun get-best-move (root)
   (let* ((*exploration-coefficient* 0))
@@ -92,8 +107,10 @@
          (multiple-value-bind (node state)
              (selection-loop root (clone-state root-state) 0)
            (incf i)
-           (backup node (estimate-state-rewards state))))
-    (get-best-move root)))
+           (backup node
+                   (estimate-state-rewards state (player node)))))
+    (values (get-best-move root)
+            root)))
 
 (defun selection-loop (node state depth)
   (with-slots (children unexplored-actions player) node
@@ -122,7 +139,7 @@
                                           :parent node
                                           :player (next-player node))))
     (push (cons child-node action) (children node))
-    child-node))
+    (values child-node child-state)))
 
 (defun next-player (node)
   (mod (1+ (player node))
@@ -169,3 +186,44 @@
    :parent parent
    :player player))
 
+(defun print-decision-tree (stream root root-state)
+  (let ((*node-dot-ids* (make-hash-table :test #'eq))
+        (*node-dot-ids-counter* 0))
+    (format stream "digraph G {~%")
+    (format stream "
+  graph [fontname = \"monospace\"];
+  node [fontname = \"monospace\"];
+  edge [fontname = \"monospace\"];")
+    (node-to-dot stream root root-state)
+    (format stream "}~%")))
+
+(defun node-dot-id (node)
+  (or (gethash node *node-dot-ids*)
+      (setf (gethash node *node-dot-ids*)
+            (incf *node-dot-ids-counter*))))
+
+(defun node-to-dot (stream node state)
+  (let ((id (node-dot-id node)))
+    (format stream "  ~A [label=\"~A\", shape=box];~%"
+            id
+            (node-dot-label node state))
+    (loop for (child . action) in (children node) do
+         (format stream "  ~A -> ~A [label = \"~A\"];~%"
+                 id
+                 (node-dot-id child)
+                 (escape-for-dot
+                  (show-action action)))
+         (node-to-dot stream child
+                      (next-state (clone-state state) action)))))
+
+(defun node-dot-label (node state)
+  (escape-for-dot
+   (with-output-to-string (stream)
+     (format stream "N: ~A~%" (visit-count node))
+     (format stream "Q: ~A~%" (simulation-rewards node))
+     (when (unexplored-actions node)
+       (format stream "A: ~A~%" (length (unexplored-actions node))))
+     (format stream "~A" (show-state state)))))
+
+(defun escape-for-dot (text)
+  (cl-ppcre:regex-replace-all "\\n" text "\\\\n"))

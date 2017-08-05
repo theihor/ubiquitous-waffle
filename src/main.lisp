@@ -80,14 +80,15 @@
 		  (format t "~A~%" move-or-stop-or-timeout)
 		  (cond
 		    ((typep m 'stop)
-		      (progn
-			(format t "Game stop.~%")
-                        (format t "Computed score:~%")
-                        (loop :for punter :below (players-number (state player))
-                           :do (format t "~A :~A~%"
-                                       punter
-                                       (score (elt (punters (state player)) punter))))
-			(return)))
+             (progn
+               (format t "Game stop.~%")
+               (when (typep (state player) 'game-with-scores)
+                 (format t "Computed score:~%")
+                 (loop :for punter :below (players-number (state player))
+                    :do (format t "~A :~A~%"
+                                punter
+                                (score (elt (punters (state player)) punter)))))
+               (return)))
 		    ((typep (car m) 'move)
 		     (progn
 			(update-player player m)
