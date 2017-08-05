@@ -9,6 +9,7 @@
                :src/bfs
                :src/game-player
                :src/decode
+               :src/mcts
                )
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)

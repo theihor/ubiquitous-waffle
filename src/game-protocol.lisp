@@ -4,6 +4,7 @@
            #:setup-punter
            #:setup-punters
            #:setup-map
+           #:setup-settings
            #:game-map
            #:map-sites
            #:map-rivers
@@ -13,6 +14,7 @@
            #:river-target
            #:move
            #:move-punter
+           #:move-state
            #:claim
            #:claim-source
            #:claim-target
@@ -23,7 +25,9 @@
            #:score-info
            #:score-info-punter
            #:score-info-score
-           ))
+           #:future
+           #:future-source
+           #:future-target))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -33,7 +37,15 @@
 (defclass setup ()
   ((punter :initarg :punter :accessor setup-punter)
    (punters :initarg :punters :accessor setup-punters)
-   (setup-map :initarg :map :accessor setup-map)))
+   (setup-map :initarg :map :accessor setup-map)
+   (setting :initarg :settings :accessor setup-settings :initform nil)))
+
+(defclass settings ()
+  ((futures :initarg :futures :accessor settings-futures)))
+
+(defclass future ()
+  ((source :initarg :source :accessor future-source)
+   (target :initarg :target :accessor future-target)))
 
 (defclass game-map ()
   ((sites :initarg :sites :accessor map-sites)
@@ -46,7 +58,8 @@
 
 ;;; move
 (defclass move ()
-  ((punter :initarg :punter :accessor move-punter)))
+  ((punter :initarg :punter :accessor move-punter)
+   (state :initarg :state :accessor move-state :initform nil)))
 
 (defclass claim (move)
   ((source :initarg :source :accessor claim-source)

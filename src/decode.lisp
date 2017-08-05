@@ -74,12 +74,18 @@
        (gethash "punters" msg-ht)
        (gethash "map" msg-ht)))
 
+(defun parse-settings-inner (settings-ht)
+  (make-instance
+   'settings
+   :futures (gethash "futures" settings-ht)))
+
 (defun parse-setup-inner (setup-ht)
   (make-instance
    'setup
    :punter (gethash "punter" setup-ht)
    :punters (gethash "punters" setup-ht)
-   :map (parse-map-inner (gethash "map" setup-ht))))
+   :map (parse-map-inner (gethash "map" setup-ht))
+   :settings (parse-settings-inner (gethash "settings" setup-ht))))
 
 (defun get-move (msg-ht)
   (gethash "move" msg-ht))
@@ -89,6 +95,9 @@
 
 (defun get-timeout (msg-ht)
   (gethash "timeout" msg-ht))
+
+(defun parse-state (msg-ht)
+  msg-ht)
 
 
 (defun parse-you (msg)
@@ -112,17 +121,19 @@
 
 (defun parse (json)
   (let ((json-ht (yason:parse json)))
-    (acond
-      ((get-handshake json-ht)
-       it)
-      ((setup-p json-ht)
-       (parse-setup-inner json-ht))
-      ((get-move json-ht)
-       (parse-moves-inner it))
-      ((get-stop json-ht)
-       (parse-stop-inner it))
-      ((get-timeout json-ht)
-       it))))
+    (values
+     (acond
+       ((get-handshake json-ht)
+        it)
+       ((setup-p json-ht)
+        (parse-setup-inner json-ht))
+       ((get-move json-ht)
+        (parse-moves-inner it))
+       ((get-stop json-ht)
+        (parse-stop-inner it))
+       ((get-timeout json-ht)
+        it))
+     (parse-state (gethash "state" json-ht)))))
 
 (defun parse-map-from-file (map-file) 
   (with-open-file (stream map-file)
