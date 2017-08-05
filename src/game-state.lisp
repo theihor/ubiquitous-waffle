@@ -12,7 +12,8 @@
            #:players-number
            #:mapc-claims
            #:punters
-           #:distance-tab))
+           #:distance-tab
+           #:dump-state))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -92,7 +93,7 @@
        (claim-edge (elt (punters state) id) src tgt (distance-tab state))
        (add-edge the-map src tgt id)))))
 
-(defun dump-state (state file)
+(defun dump-graph-with-distances (state file)
   (let ((rev-dist (make-hash-table :test #'equal)))
     (maphash (lambda (mine-node d)
                (let ((tab (or (gethash (cdr mine-node) rev-dist)
@@ -105,3 +106,34 @@
      :node-label (lambda (n)
                    (format nil "\"~A\""(alexandria:hash-table-values
                                         (gethash n rev-dist)))))))
+
+(defparameter *dot-colors*
+  '(blue red green orange bisque3   	black 	
+    blue1 	blue2 	blue3 	 	blueviolet
+    brown 	brown3 	brown4
+    burlywood 	 	burlywood4
+    cadetblue 	 	cadetblue4
+    chartreuse 	 	chartreuse4
+    chocolate 	chocolate1 	
+    coral 	 	coral4))
+
+(defun dump-state (state file)
+  (with-open-file (s file
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (format s "graph g {~%")
+    (loop :for p :across (punters state)
+       :for i :from 0
+       :do (let ((color (format nil "~A" (nth i *dot-colors*))))
+             (maphash (lambda (source targets)
+                        (maphash
+                         (lambda (target data)
+                           (declare (ignore data))
+                           (when (< source target)
+                             (format s "~A -- ~A [color=~A,label=\"~A\"];~%"
+                                     source target color
+                                     )))
+                         targets))
+                      (graph-edges (punter-graph p)))))
+    (format s "}~%")))

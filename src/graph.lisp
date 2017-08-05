@@ -15,7 +15,8 @@
            #:hash-graph
            #:graph
            #:num-edges
-           #:num-nodes))
+           #:num-nodes
+           #:graph-edges))
 
 (in-package :src/graph)
 
@@ -107,7 +108,8 @@ Nil when there is no neighbours."
 ;; Hash graph
 
 (defclass hash-graph (graph)
-  ((edges :initarg :edges)))
+  ((edges :initarg :edges
+          :reader graph-edges)))
 
 (defun gethash-with-create (node tab)
   (let ((res (gethash node tab)))
