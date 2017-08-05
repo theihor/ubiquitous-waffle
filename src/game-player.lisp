@@ -142,10 +142,24 @@
   (make-instance 'connector-player))
 
 (defmethod init-player :after ((player connector-player) setup-message)
-  (with-slots (avail-graph state current-network mines) player
+  (with-slots (avail-graph state current-network) player
     (setf avail-graph (clone-graph (game-map state)))
     (setf current-network (make-hash-table :test #'equal))
-    (setf mines (mines state))))
+    (let* ((mines (mines state))
+           (mine-scores
+            (loop :for mine :in mines
+               :collect
+               (cons mine
+                     (loop
+                        :for other-mine :in mines
+                        :for dist = (gethash (cons mine other-mine) (distance-tab state))
+                        :when dist
+                        :summing dist))))
+           (sorted (mapcar #'car
+                           (sort (copy-list mine-scores)
+                                 #'<
+                                 :key #'cdr))))
+      (setf (mines player) sorted))))
 
 (defmethod update-player :after ((player connector-player) moves)
   (with-slots (current-network avail-graph state mines) player
@@ -173,12 +187,11 @@
                              (t (make-claim state src trgt)))))
                    (%do-random-move)))
              (%dist (node)
-               (let ((dist (loop
-                              :for claimed-mine :in claimed-mines
-                              :for val = (gethash (cons claimed-mine node) (distance-tab state))
-                              :when val
-                              :summing val)))
-                 (* dist dist)))
+               (loop
+                  :for claimed-mine :in claimed-mines
+                  :for val = (gethash (cons claimed-mine node) (distance-tab state))
+                  :when val
+                  :summing (* val val)))
              (%do-random-move ()
                (let ((max-move nil)
                      (max-dist 0))
