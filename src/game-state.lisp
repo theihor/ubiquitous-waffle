@@ -36,7 +36,8 @@
    (players-number :initarg :players-number
                    :reader players-number
                    :type integer)
-   (distance-tab :accessor distance-tab)))
+   (distance-tab :accessor distance-tab
+                 :documentation "Map (mine . target) -> distance")))
 
 (defgeneric process-moves (state moves))
 (defgeneric dump-state (state moves))
