@@ -126,7 +126,12 @@
                  (setf
                   (slot-value instance slot)
                   (total-parse-inner (gethash (symbol-name slot) ht)))))))))
-      ht))
+      (if (and (stringp ht)
+               (> (length ht) 0))
+          (cond ((eq (elt ht 0) #\:) (intern (subseq ht 1) :keyword))
+                ((eq (elt ht 0) #\#) (intern (subseq ht 1)))
+                (t ht))
+          ht)))
 
 
 (defun parse-you (msg)

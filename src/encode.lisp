@@ -99,9 +99,6 @@
 
 (defmethod yason:encode ((obj symbol) &optional stream)
   (yason:with-output (stream)
-    (let ((type (if (keywordp obj) "KEYWORD" "SYM")))
-      (yason:with-object ()
-        (yason:encode-object-element
-         "__type" type)
-        (yason:encode-object-element
-         "value" (symbol-name obj))))))
+    (let ((prefix (if (keywordp obj) ":" "#")))
+      (yason:encode (format nil "~A~A" prefix obj) stream))))
+
