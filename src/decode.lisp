@@ -5,7 +5,8 @@
            #:parse-setup
            #:parse-moves
            #:parse-stop
-           #:parse-map))
+           #:parse-map
+           #:total-parse))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -100,6 +101,17 @@
 (defun parse-state (msg-ht)
   msg-ht)
 
+;; (defun total-parse-inner (ht)
+;;   (flet ((%slot-name (slot)
+;;            (first slot)))
+;;    (aif (gethash "__type" ht)
+;;         (let ((instance (make-instance (intern it))))
+;;           (dolist (slot  instance)
+;;             (setf
+;;              (intern (string-upcase (cl-mop:slot-name instance (%slot-name slot))))
+;;              (gethash (%slot-name slot) ht))))
+;;         ht)))
+
 
 (defun parse-you (msg)
   (let ((you-ht (yason:parse msg)))
@@ -141,3 +153,7 @@
     (let ((contents (make-string (file-length stream))))
       (read-sequence contents stream)
       (parse-map contents))))
+
+;; (defun total-parse (json)
+;;   (let ((json-ht (yason:parse json)))
+;;     (total-parse-inner json-ht)))
