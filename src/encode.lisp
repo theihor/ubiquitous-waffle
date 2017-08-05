@@ -60,3 +60,48 @@
   (encode-msg
    (with-output-to-string (stream)
      (yason:encode move stream))))
+
+;;;
+;;; universal encoder
+;;;
+(defmethod yason:encode ((obj standard-object) &optional stream)
+  (let ((class (class-of obj)))
+    (yason:with-output (stream)
+      (yason:with-object ()
+        (yason:encode-object-element
+         "__type" (string-upcase (string (class-name class))))
+        (dolist (slot (sb-mop:class-slots class))
+          (let ((slot-name (sb-mop:slot-definition-name slot)))
+            (yason:encode-object-element
+             (string slot-name) (slot-value obj slot-name))))))))
+
+(defmethod yason:encode ((obj hash-table) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:encode-object-element
+       "__type" "HASH-TABLE")
+      (yason:encode-object-element
+       "content" (alexandria:hash-table-plist obj)))))
+
+(defmethod yason:encode ((obj cons) &optional stream)
+  (yason:with-output (stream)
+    (if (listp (cdr obj))
+        (yason:with-array ()
+          (dolist (x obj)
+            (yason:encode-array-element x)))
+        (yason:with-object ()
+          (yason:encode-object-element
+           "__type" "PAIR")
+          (yason:encode-object-element
+           "car" (car obj))
+          (yason:encode-object-element
+           "cdr" (cdr obj))))))
+
+(defmethod yason:encode ((obj symbol) &optional stream)
+  (yason:with-output (stream)
+    (let ((type (if (keywordp obj) "KEYWORD" "SYM")))
+      (yason:with-object ()
+        (yason:encode-object-element
+         "__type" type)
+        (yason:encode-object-element
+         "value" (symbol-name obj))))))
