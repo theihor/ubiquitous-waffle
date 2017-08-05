@@ -39,37 +39,43 @@
       (format s "winner: ~A~%" (winner? state)))))
 
 (defmethod possible-actions ((s tic-tac-toe) p)
-  (let* ((f (field s))
-         (dims (array-dimensions f))
-         (actions nil)
-         (free-cells nil))
-    (loop for i below (first dims) do
-         (loop for j below (second dims) do
-              (when (eq (aref f i j) :.)
-                (push (cons i j) free-cells))
-              (labels ((%push? (i j)
-                         (when (free? f i j)
-                           (push (list i j p) actions))))
-                (unless (free? f i j)
-                  (%push? (1+ i) j)
-                  (%push? (1- i) j)
-                  (%push? i (1+ j))
-                  (%push? i (1- j))))))
-    (cond
-      (actions actions)
-      (free-cells
-       (let* ((ci (floor (first dims) 2))
-              (cj (floor (second dims) 2))
-              (free-cells
-               (sort
-                free-cells #'<
-                :key (lambda (cell)
-                       (destructuring-bind (i . j) cell
-                         (let ((a (- i ci))
-                               (b (- j cj)))
-                           (+ (* a a) (* b b)))))))
-              (cell (first free-cells)))
-         (list (list (car cell) (cdr cell) p)))))))
+  (unless (winner? s)
+    (let* ((f (field s))
+           (dims (array-dimensions f))
+           (actions nil)
+           (free-cells nil))
+      (loop for i below (first dims) do
+           (loop for j below (second dims) do
+                (when (eq (aref f i j) :.)
+                  (push (cons i j) free-cells))
+                (labels ((%push? (i j)
+                           (when (free? f i j)
+                             (push (list i j p) actions))))
+                  (unless (free? f i j)
+                    (%push? (1+ i) j)
+                    (%push? (1- i) j)
+                    (%push? i (1+ j))
+                    (%push? i (1- j))
+                    (%push? (1- i) (1- j))
+                    (%push? (1+ i) (1+ j))
+                    (%push? (1- i) (1+ j))
+                    (%push? (1+ i) (1- j))
+                    ))))
+      (cond
+        (actions actions)
+        (free-cells
+         (let* ((ci (floor (first dims) 2))
+                (cj (floor (second dims) 2))
+                (free-cells
+                 (sort
+                  free-cells #'<
+                  :key (lambda (cell)
+                         (destructuring-bind (i . j) cell
+                           (let ((a (- i ci))
+                                 (b (- j cj)))
+                             (+ (* a a) (* b b)))))))
+                (cell (first free-cells)))
+           (list (list (car cell) (cdr cell) p))))))))
 
 (defun free? (f i j)
   (let ((r
@@ -89,9 +95,17 @@
       (let ((up (count-moves f i j 1 0))
             (down (count-moves f i j -1 0))
             (left (count-moves f i j 0 -1))
-            (right (count-moves f i j 0 1)))
-        (when (member 5 (list (+ up down 1)
-                              (+ left right 1)))
+            (right (count-moves f i j 0 1))
+            ;; diagonal moves
+            (up-right (count-moves f i j 1 1))
+            (down-left (count-moves f i j -1 -1))
+            (up-left (count-moves f i j 1 -1))
+            (down-right (count-moves f i j -1 1)))
+        (when (member 4 (list (+ up down)
+                              (+ left right)
+                              (+ up-left down-right)
+                              (+ up-right down-left)
+                              ))
           (setf (winner? s) p))))
     s))
 
@@ -124,8 +138,9 @@
 
 (defmethod estimate-state-rewards ((s tic-tac-toe) p)
   (if (winner? s)
-      (let ((r (make-array *players-number* :initial-element 0)))
+      (let ((r (make-array *players-number* :initial-element -1)))
         (setf (aref r (winner? s)) 1)
+        ;; (format t "winner: ~A~%" (winner? s))
         r)
       (let* ((actions-list (possible-actions s p)))
         (if actions-list
@@ -133,8 +148,7 @@
                    (n (random (array-dimension actions 0))))
               (next-state s (aref actions n))
               (estimate-state-rewards s (mod (1+ p) *players-number*)))
-            (make-array *players-number*
-                        :initial-element (/ 1 *players-number*))))))
+            (make-array *players-number* :initial-element 0)))))
 
 ;; TODO: debug me with this:
 ;; (SRC/TEST/TIC-TAC-TOE::play :debug-file "~/tmp/ttt" :seed 200)
@@ -145,6 +159,7 @@
         (*random-state* (if seed
                             (sb-ext:seed-random-state seed)
                             *random-state*))
+        (exploration-coefficient 1)
         (state (make-initial-state 10)))
     (loop while (or (null (winner? state))
                     (null (possible-actions state 0)))
@@ -169,8 +184,9 @@
               :root-state state
               :root-player 1
               :players-number *players-number*
-              :max-iters 200
-              :max-selection-depth 5)
+              :max-iters 20000
+              :max-selection-depth 6
+              :exploration-coefficient exploration-coefficient)
            (when debug-file
              (let ((dot (make-pathname :defaults debug-file
                                        :type "dot")))
@@ -178,13 +194,14 @@
                                        :direction :output
                                        :if-exists :supersede
                                        :if-does-not-exist :create)
-                 (print-decision-tree stream root-node state))
-               (sb-ext:run-program "dot" (list "-Tsvg" "-O" (namestring (truename dot)))
-                                   :search t
-                                   :wait t
-                                   :error *error-output*
-                                   :output *standard-output*
-                                   :if-error-exists :error)
+                 (print-decision-tree stream root-node state
+                                      :exploration-coefficient exploration-coefficient))
+               ;; (sb-ext:run-program "dot" (list "-Tsvg" "-O" (namestring (truename dot)))
+               ;;                     :search t
+               ;;                     :wait t
+               ;;                     :error *error-output*
+               ;;                     :output *standard-output*
+               ;;                     :if-error-exists :error)
                ;; (sb-ext:run-program "eog" (list (format nil "~A.svg" (namestring (truename dot))))
                ;;                     :search t
                ;;                     :wait nil)
@@ -198,3 +215,46 @@
                  (setf state (next-state state move))))))
     (when (winner? state)
       (format t "~A" (show-state state)))))
+
+(defun test ()
+  (let ((*random-state* (sb-ext:seed-random-state 200))
+        (s (make-initial-state 10)))
+    (dolist (m '((0 0 0) (4 5 1)
+                 (4 4 0) (5 4 1)
+                 (4 3 0) (5 3 1)
+                 (4 2 0) (5 2 1)
+                 (4 1 0) (5 1 1)))
+      (setf s (next-state s m)))
+    (format t "~A" (show-state s))
+    (let* ((exploration-coefficient 0.3))
+      (multiple-value-bind (next-move root-node)
+          (select-next-move
+           :root-state s
+           :root-player 1
+           :players-number *players-number*
+           :max-iters 200000
+           :max-selection-depth 2
+           :exploration-coefficient exploration-coefficient)
+        (let ((new-s (next-state (clone-state s) next-move)))
+          (format t "move: ~A~%" next-move)
+          (format t "~A" (show-state new-s))
+          (format t "total nodes: ~A~%" (count-nodes root-node))
+          (let ((dot (make-pathname :defaults (pathname "~/tmp/ttt")
+                                    :type "dot")))
+            (with-open-file (stream dot
+                                    :direction :output
+                                    :if-exists :supersede
+                                    :if-does-not-exist :create)
+              (print-decision-tree stream root-node (clone-state s)
+                                   :exploration-coefficient exploration-coefficient))
+            ;; (sb-ext:run-program "dot" (list "-Tsvg" "-O" (namestring (truename dot)))
+            ;;                     :search t
+            ;;                     :wait t
+            ;;                     :error *error-output*
+            ;;                     :output *standard-output*
+            ;;                     :if-error-exists :error)
+            ;; (sb-ext:run-program "eog" (list (format nil "~A.svg" (namestring (truename dot))))
+            ;;                     :search t
+            ;;                     :wait nil)
+            )))
+      )))
