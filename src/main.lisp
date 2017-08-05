@@ -12,7 +12,6 @@
 
 ;; tcp
 (defparameter *punter-server* "punter.inf.ed.ac.uk")
-(defparameter *game-port* 9002)
 
 (defun nslookup (hostname)
    (and hostname
@@ -45,15 +44,14 @@
 
 (defun tcp-read (socket)
    (when socket
-     (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t)))
+     (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t :external-format :utf-8)))
        (read-with-size stream))))
 
 ;;run example (main-online 9066 'cowboy-player)
 (defun main-online (port &rest player-params)
-  (print "Online.")
   (let ((socket (tcp-connect *punter-server* port))
 	(player (apply #'make-player player-params))
-	(setup))
+	(s))
     (unwind-protect
 	 (progn
 	   ;; send me
@@ -62,32 +60,26 @@
 	   ;; get you
 	   (format t "Getting you... ~A~%" (tcp-read socket))
 	   ;; get setup
-	   (setf setup (tcp-read socket))
-	   (format t "~A~%" setup)
-	   (setf setup (parse-setup setup))
-	   (when setup
-	     (format t "Getting setup... Punter:~A~%" (setup-punter setup))
-	     (init-player player setup)
+	   (setf s (tcp-read socket))
+	   ;; (format t "~A~%" s)
+	   (setf s (parse s))
+	   (when (and s (typep s 'setup))
+	     (format t "Getting setup... Punter:~A~%" (setup-punter s))
+	     (init-player player s)
+
+	     ;;TODO: Add futures handling
+
 	     ;; send ready
 	     (format t "Sending ready...~%")
-	     (tcp-send socket (encode-ready (setup-punter setup)))
+	     (tcp-send socket (encode-ready (setup-punter s)))
 	     ;; loop for moves until stop
 	     (loop
-		  ;; get move
-		  (let ((move-or-stop (tcp-read socket))
-			(move)
-			(stop))
-		    (format t "~A~%" move-or-stop)
-		    (handler-case
-		    	(setf move (parse-moves move-or-stop))
-		    	(error () (setf stop (parse-stop move-or-stop))))
-		    (if move
-			(progn
-			  (update-player player move)
-			  (let ((new-move (select-move player)))
-			    ;; send claim
-			    (tcp-send socket (encode-move new-move))))
-		      ;;game stop
+		;; get move
+		(let* ((move-or-stop-or-timeout (tcp-read socket))
+		       (m (parse move-or-stop-or-timeout)))
+		  (format t "~A~%" move-or-stop-or-timeout)
+		  (cond
+		    ((typep m 'stop)
 		      (progn
 			(format t "Game stop.~%")
                         (format t "Computed score:~%")
@@ -95,7 +87,13 @@
                            :do (format t "~A :~A~%"
                                        punter
                                        (score (elt (punters (state player)) punter))))
-			(return)))))))
+			(return)))
+		    ((typep (car m) 'move)
+		     (progn
+			(update-player player m)
+			(let ((new-move (select-move player)))
+			  (tcp-send socket (encode-move new-move)))))
+		    (t (format t "Timeout.~%")))))))
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)))))
 
