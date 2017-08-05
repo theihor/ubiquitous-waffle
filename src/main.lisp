@@ -5,7 +5,8 @@
         :src/game-player
         :src/punter
         :src/game-state
-        :src/graph))
+        :src/graph
+        :src/mcts-player))
 
 (in-package :src/main)
 
@@ -95,8 +96,9 @@
 			(update-player player m)
 			(let ((new-move (select-move player)))
 			  (tcp-send socket (encode-move new-move))
-              (setf (move-state new-move) player)
-              (format t "Encoded move: ~A~%" (encode-move new-move)))))
+              ;; (setf (move-state new-move) player)
+              ;; (format t "Encoded move: ~A~%" (encode-move new-move))
+              )))
 		    (t (format t "Timeout.~%")))))))
       ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")

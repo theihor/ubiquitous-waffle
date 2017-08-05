@@ -3,7 +3,8 @@
           :src/game-protocol
           :src/graph
           :src/punter
-          :src/bfs)
+          :src/bfs
+          :src/utils)
   (:export #:make-game-state
            #:process-moves
            #:game-map
@@ -15,7 +16,9 @@
            #:distance-tab
            #:dump-state
            #:game
-           #:game-with-scores))
+           #:game-with-scores
+           #:clone-game
+           ))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -23,7 +26,7 @@
 
 (defclass game ()
   ((game-map :initarg :game-map
-             :reader game-map)
+             :accessor game-map)
    (mines :initarg :mines
           :reader mines
           :type list)
@@ -38,6 +41,14 @@
                    :type integer)
    (distance-tab :accessor distance-tab
                  :documentation "Map (mine . target) -> distance")))
+
+(defgeneric clone-game (game))
+
+(defmethod clone-game (game)
+  (copy-instance game))
+
+(defmethod clone-game :after ((game game))
+  (setf (game-map game) (clone-graph (game-map game)) ))
 
 (defgeneric process-moves (state moves))
 (defgeneric dump-state (state moves))
@@ -103,6 +114,15 @@
                                              :graph (make-graph 'hash-graph)
                                              :mines (mines state)
                                              :sites (sites state))))))
+
+(defmethod clone-game :after ((state game-with-scores))
+  (setf (punters state)
+        (make-array (array-dimensions (punters state))
+                    :initial-contents (mapcar #'clone-punter (coerce (punters state) 'list)))))
+
+(defun clone-punter (punter)
+  (copy-instance punter
+                 :graph (clone-graph (punter-graph punter))))
 
 (defmethod process-moves ((state game-with-scores) moves)
   (let ((the-map (game-map state)))
