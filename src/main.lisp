@@ -149,8 +149,10 @@
            (when state
              (setf player state)
              (update-player player m)
+             (debug-log "Player updated...~%")
              (let* ((new-move (select-move player))
                     (dummy (setf (move-state new-move) player))
+                    (dummy2 (debug-log "Move selected...~%"))
                     (encoded-move (encode-move new-move)))
                (debug-log "Sending move... ~A~%" encoded-move)
                (format-std "~A" encoded-move)))
