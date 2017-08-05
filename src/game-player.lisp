@@ -12,7 +12,9 @@
    #:cowboy-player
    #:connector-player
    #:state
-   #:make-claim))
+   #:make-pass
+   #:make-claim
+   #:game-player))
 
 (declaim (optimize (debug 0) (safety 0) (speed 3)))
 
@@ -20,6 +22,7 @@
 
 (defclass game-player ()
   ((state :accessor state
+          :initarg :state
           :initform nil)))
 
 (defgeneric make-player (player-class &rest params))

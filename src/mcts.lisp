@@ -9,7 +9,8 @@
            #:clone-state
            #:show-state
            #:estimate-state-rewards
-           #:print-decision-tree)
+           #:print-decision-tree
+           #:count-nodes)
   (:import-from :cl-ppcre))
 
 (in-package :src/mcts)
@@ -109,7 +110,8 @@
            (incf i)
            (backup node
                    (estimate-state-rewards state (player node)))))
-    (values (get-best-move root)
+    (values (when (children root)
+              (get-best-move root))
             root)))
 
 (defun selection-loop (node state depth)
@@ -172,11 +174,15 @@
      while node
      do
        (incf (visit-count node))
-       (let ((node-reward-vector (simulation-rewards node)))
+       (let ((node-reward-vector (simulation-rewards node))
+             (i (player node)))
+         (incf (aref node-reward-vector i)
+               (aref reward-vector i))
          ;; pairwise (simulation-reward node) + reward-vector
-         (loop for i below (length node-reward-vector) do
-              (incf (aref node-reward-vector i)
-                    (aref reward-vector i))))))
+         ;; (loop for i below (length node-reward-vector) do
+         ;;      (incf (aref node-reward-vector i)
+         ;;            (aref reward-vector i)))
+         )))
 
 (defun make-node-for-state (state &key parent player)
   (assert player)
@@ -186,15 +192,16 @@
    :parent parent
    :player player))
 
-(defun print-decision-tree (stream root root-state)
+(defun print-decision-tree (stream root root-state &key (exploration-coefficient 1))
   (let ((*node-dot-ids* (make-hash-table :test #'eq))
-        (*node-dot-ids-counter* 0))
+        (*node-dot-ids-counter* 0)
+        (*exploration-coefficient* exploration-coefficient))
     (format stream "digraph G {~%")
     (format stream "
   graph [fontname = \"monospace\"];
   node [fontname = \"monospace\"];
   edge [fontname = \"monospace\"];")
-    (node-to-dot stream root root-state)
+    (node-to-dot stream root root-state t)
     (format stream "}~%")))
 
 (defun node-dot-id (node)
@@ -202,28 +209,46 @@
       (setf (gethash node *node-dot-ids*)
             (incf *node-dot-ids-counter*))))
 
-(defun node-to-dot (stream node state)
-  (let ((id (node-dot-id node)))
-    (format stream "  ~A [label=\"~A\", shape=box];~%"
+(defun node-to-dot (stream node state best?)
+  (let ((id (node-dot-id node))
+        (best-child (when (children node)
+                      (car (select-best-child node)))))
+    (format stream "  ~A [label=\"~A\", shape=box ~A];~%"
             id
-            (node-dot-label node state))
+            (node-dot-label node state)
+            (if best? ", fillcolor=lightgray, style=filled" ""))
     (loop for (child . action) in (children node) do
          (format stream "  ~A -> ~A [label = \"~A\"];~%"
                  id
                  (node-dot-id child)
                  (escape-for-dot
                   (show-action action)))
-         (node-to-dot stream child
-                      (next-state (clone-state state) action)))))
+         (node-to-dot stream
+                      child
+                      (next-state (clone-state state) action)
+                      (eq child best-child)))))
 
 (defun node-dot-label (node state)
   (escape-for-dot
    (with-output-to-string (stream)
-     (format stream "N: ~A~%" (visit-count node))
-     (format stream "Q: ~A~%" (simulation-rewards node))
-     (when (unexplored-actions node)
-       (format stream "A: ~A~%" (length (unexplored-actions node))))
+     (format stream "N: ~A Q: ~A P: ~A~A~%"
+             (visit-count node)
+             (simulation-rewards node)
+             (player node)
+             (if (unexplored-actions node)
+                 (format nil " A: ~A~%" (length (unexplored-actions node)))
+                 ""))
      (format stream "~A" (show-state state)))))
 
 (defun escape-for-dot (text)
   (cl-ppcre:regex-replace-all "\\n" text "\\\\n"))
+
+(defun count-nodes (root)
+  (let ((queue (list root))
+        (count 0))
+    (loop while queue do
+         (incf count)
+         (let ((n (pop queue)))
+           (dolist (c (children n))
+             (push (car c) queue))))
+    count))
