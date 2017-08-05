@@ -24,7 +24,7 @@
 	(let ((socket (make-instance 'sb-bsd-sockets:inet-socket :type  :stream :protocol :tcp)))
 	  (sb-bsd-sockets:socket-connect socket (nslookup server) port)
 	  socket)
-      (host-not-found-error ()
+      (sb-bsd-sockets:host-not-found-error ()
 	(format t "Host ~A not found." server)
 	(force-output)
 	nil))))
@@ -116,7 +116,7 @@
 (defun main-offline ()
 
   (let ((stdin *standard-input*)
-        (stdout *standard-output*)
+        ;; (stdout *standard-output*)
         (player (make-player 'connector-player))
         (*package* (find-package :src/main)))
     
@@ -154,6 +154,7 @@
                     (dummy (setf (move-state new-move) player))
                     (dummy2 (debug-log "Move selected...~%"))
                     (encoded-move (encode-move new-move)))
+               (declare (ignorable dummy dummy2))
                (debug-log "Sending move... ~A~%" encoded-move)
                (format-std "~A" encoded-move)))
            )
