@@ -48,11 +48,36 @@
      (let ((stream (sb-bsd-sockets:socket-make-stream socket :input t :external-format :utf-8)))
        (read-with-size stream))))
 
+(defclass game-log ()
+  ((game-log-map :accessor game-log-map
+                   :initform nil)
+   (game-log-rev-moves :accessor game-log-rev-moves
+                       :initform nil)))
+
+(defvar *game-log*)
+
+(defun game-logger-setup (s)
+  (setf (game-log-map *game-log*) (gethash "map" s)))
+
+(defun game-logger-add-move (move)
+  (push move (game-log-rev-moves *game-log*)))
+
+(defun game-logger-print (file-name)
+  (let ((*yason-lisp-readable-encode* nil))
+    (with-open-file (stream file-name :direction :output :if-exists :supersede :if-does-not-exist :create)
+      (yason:with-output (stream)
+        (yason:with-object ()
+          (yason:encode-object-element "map" (game-log-map *game-log*))
+          (yason:encode-object-element "moves" (reverse (game-log-rev-moves *game-log*))))))))
+
 ;;run example (main-online 9066 'cowboy-player)
 (defun main-online (port &rest player-params)
   (let ((socket (tcp-connect *punter-server* port))
 	(player (apply #'make-player player-params))
-	(s))
+        (*game-log* (make-instance 'game-log))
+	(s)
+        (setup-ht)
+        (the-state))
     (unwind-protect
 	 (progn
 	   ;; send me
@@ -63,9 +88,10 @@
 	   ;; get setup
 	   (setf s (tcp-read socket))
 	   ;; (format t "~A~%" s)
-	   (setf s (parse s))
+	   (multiple-value-setq (s the-state setup-ht) (parse s))
 	   (when (and s (typep s 'setup))
 	     (format t "Getting setup... Punter:~A~%" (setup-punter s))
+             (game-logger-setup setup-ht)
 	     (init-player player s)
 
 	     ;;TODO: Add futures handling
@@ -81,26 +107,30 @@
 		  (format t "~A~%" move-or-stop-or-timeout)
 		  (cond
 		    ((typep m 'stop)
-             (progn
-               (format t "Game stop.~%")
-               (when (typep (state player) 'game-with-scores)
-                 (format t "Computed score:~%")
-                 (loop :for punter :below (players-number (state player))
-                    :do (format t "~A :~A~%"
-                                punter
-                                (score (elt (punters (state player)) punter)))))
-               (return)))
+                     (progn
+                       (format t "Game stop.~%")
+                       (when (typep (state player) 'game-with-scores)
+                         (format t "Computed score:~%")
+                         (loop :for punter :below (players-number (state player))
+                            :do (format t "~A :~A~%"
+                                        punter
+                                        (score (elt (punters (state player)) punter)))))
+                       (return)))
 		    ((typep (car m) 'move)
 		     (progn
-			(update-player player m)
-			(let ((new-move (select-move player)))
-			  (tcp-send socket (encode-move new-move))
-              (setf (move-state new-move) player)
-              (format t "Encoded move: ~A~%" (encode-move new-move)))))
+                       (update-player player m)
+                       (loop :for move :in m
+                          :do (game-logger-add-move move))
+                       (let ((new-move (select-move player)))
+                         (tcp-send socket (encode-move new-move))
+                         ;; (setf (move-state new-move) player)
+                         ;; (format t "Encoded move: ~A~%" (encode-move new-move))
+                         )))
 		    (t (format t "Timeout.~%")))))))
       ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")
-	     (sb-bsd-sockets:socket-close socket)))))
+	     (sb-bsd-sockets:socket-close socket)
+             (game-logger-print "game.json")))))
 
 (defun format-std (str &rest params)
   (apply #'format *standard-output* str params)

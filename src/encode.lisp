@@ -2,7 +2,8 @@
     (:use :common-lisp :anaphora :src/game-protocol)
   (:export #:encode-me
            #:encode-ready
-           #:encode-move))
+           #:encode-move
+           #:*yason-lisp-readable-encode*))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -75,13 +76,17 @@
             (yason:encode-object-element
              (string slot-name) (slot-value obj slot-name))))))))
 
-(defmethod yason:encode ((obj hash-table) &optional stream)
-  (yason:with-output (stream)
-    (yason:with-object ()
-      (yason:encode-object-element
-       "__type" "HASH-TABLE")
-      (yason:encode-object-element
-       "content" (alexandria:hash-table-plist obj)))))
+(defparameter *yason-lisp-readable-encode* t)
+
+(defmethod yason:encode :around ((obj hash-table) &optional stream)
+  (if *yason-lisp-readable-encode*
+      (yason:with-output (stream)
+        (yason:with-object ()
+          (yason:encode-object-element
+           "__type" "HASH-TABLE")
+          (yason:encode-object-element
+           "content" (alexandria:hash-table-plist obj))))
+      (call-next-method)))
 
 (defmethod yason:encode ((obj cons) &optional stream)
   (yason:with-output (stream)
