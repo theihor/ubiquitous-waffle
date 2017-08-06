@@ -162,8 +162,11 @@
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)
              (game-logger-print
-              (format nil "~A-~A-~A"
-                      team-name (get-player-name player) port))))))
+              (format nil "~A-~A-~A-~A"
+                      team-name
+                      (get-player-name player)
+                      port
+                      (get-internal-real-time)))))))
 
 (defun format-std (str &rest params)
   (apply #'format *standard-output* str params)
