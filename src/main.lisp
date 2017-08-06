@@ -228,6 +228,12 @@
     )
   )
 
+(defun run-players-on-port (players port)
+  "Runs players from the PLAYERS list on game with port PORT"
+  (dolist (player players)
+    (sb-thread:make-thread
+     (lambda () (main-online port player)))))
+
 ;; (defun main ()
 ;;   (when sb-ext:*posix-argv*
 ;;     (let* ((parsed-args (apply-argv:parse-argv* ;;'("./test" "-f" "problems/problem_1.json")))
