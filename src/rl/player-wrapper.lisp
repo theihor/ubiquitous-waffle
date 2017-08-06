@@ -81,3 +81,6 @@
                      :if-does-not-exist :create)
     (loop :for w :in (cl-rl::agent-theta (agent player-wrapper)) :do
        (format f "~A~%" w))))
+
+(defmethod player-futures ((p rl-player-wrapper))
+  nil)
