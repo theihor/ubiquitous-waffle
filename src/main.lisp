@@ -228,11 +228,14 @@
     )
   )
 
-(defun run-players-on-port (players port)
+(defun run-players-on-port (port &rest players)
   "Runs players from the PLAYERS list on game with port PORT"
   (dolist (player players)
     (sb-thread:make-thread
-     (lambda () (main-online port player)))))
+     (lambda ()
+       (if (listp player)
+           (apply #'main-online port player)
+           (main-online port player))))))
 
 ;; (defun main ()
 ;;   (when sb-ext:*posix-argv*
