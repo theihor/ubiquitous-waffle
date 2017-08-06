@@ -76,6 +76,28 @@ function show_history_file() {
                 node.style("height", mine_size);
             });
         });
+	json.futures.forEach(function (future) {
+            cy.nodes("#node_" + future.target).forEach(function(node) {
+                node.style("background-color", "orange");
+                node.style("width", mine_size);
+                node.style("height", mine_size);
+            });
+	    cy.add([
+                { group: "edges",
+                  data: { id: "future_" + future.source + "_" + future.target,
+                          source: "node_" + future.source,
+                          target: "node_" + future.target,
+                        }
+                }
+            ]);
+	    cy.edges("#future_" + future.source + "_" + future.target)
+		.forEach(function(edge) {
+		    edge.style("line-color", "orange");
+		    edge.style("opacity", "0.2");
+		    edge.style("z-index", 0);
+		});
+		    
+        });
         cy.fit();
 
         document.timestamp = 0;
@@ -136,7 +158,7 @@ function bounding_box(sites) {
                max_y: null
             }
     sites.forEach(function (site) {
-        if (r.min_x == null) {
+        if (r.min_x != null) {
             if (r.min_x > site.x)
                 r.min_x = site.x;
             if (r.max_x < site.x)
@@ -153,7 +175,6 @@ function bounding_box(sites) {
             r.max_y = site.y;
         }
     });
-
     return r;
 }
 
