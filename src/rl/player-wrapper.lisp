@@ -11,9 +11,9 @@
 
 (in-package :src/rl/player-wrapper)
 
-(defparameter *alpha* 0.4)
+(defparameter *alpha* 0.1)
 (defparameter *gamma* 0.99)
-(defparameter *td-lambda* 0.8)
+(defparameter *td-lambda* 0.7)
 
 (defclass rl-player-wrapper ()
   ((agent :accessor agent

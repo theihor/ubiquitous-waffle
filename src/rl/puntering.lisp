@@ -43,7 +43,7 @@
     (update-player next-state (message p))
     (let* ((reward (- (score (state next-state))
                       prev-score))
-           (reward (if (= 0 reward) -0.1 reward)))
+           (reward (if (= 0 reward) -1 reward)))
       (values next-state reward))))
 
 (defparameter *initial-state* nil)
@@ -60,7 +60,7 @@
 (defmethod state-features ((p puntering) player-state)
   (with-slots (group->edges) player-state
     (let* ((total 0)
-           (lst (loop :for i :from 0 :below *groups-n* :collect
+           (lst (loop :for i :from 0 :below (* *groups-n1* *groups-n2*) :collect
                    (let ((n (length (gethash i group->edges))))
                      (incf total n)
                      n))))
