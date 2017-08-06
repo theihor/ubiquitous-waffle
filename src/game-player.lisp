@@ -179,6 +179,158 @@
               (%move-from target (gethash target prev))
               nil)))))
 
+(defun hash-tables-intersect? (big-tab small-tab)
+  (maphash (lambda (key val)
+             (declare (ignore val))
+             (when (gethash key big-tab)
+               (return-from hash-tables-intersect? key)))
+           small-tab)
+  nil)
+
+(defun hash-table-add (big-tab small-tab)
+  (maphash (lambda (key val)
+             (setf (gethash key big-tab) val))
+           small-tab))
+
+(defun cluster-freedom (graph cluster)
+  (let ((adj (make-hash-table :test #'equal)))
+    (maphash (lambda (node val)
+               (declare (ignore val))
+               (mapc-node-edges graph node
+                                (lambda (neighbour data)
+                                  (declare (ignore data))
+                                  (setf (gethash neighbour adj) t))))
+             cluster)
+    (hash-table-count adj)))
+
+(defun singleton-hash-table (value)
+  (let ((tab (make-hash-table :test #'equal)))
+    (setf (gethash value tab) t)
+    tab))
+
+(defun find-regions-connecting-move (graph current-network target-cluster)
+  (let ((found (hash-tables-intersect? current-network target-cluster)))
+    (if found
+        (list found)
+        (let ((nodes (alexandria:hash-table-keys current-network))
+              (prev (alexandria:copy-hash-table current-network)))
+          (labels ((%bfs (nodes)
+                     (let ((new-nodes nil))
+                       (loop :for node :in nodes
+                          :do (mapc-node-edges
+                               graph node
+                               (lambda (neighbour data)
+                                 (declare (ignore data))
+                                 (unless (gethash neighbour prev)
+                                   (setf (gethash neighbour prev)
+                                         node)
+                                   (push neighbour new-nodes)
+                                   (when (gethash neighbour target-cluster)
+                                     (return-from %bfs (values t neighbour)))))))
+                       (when new-nodes
+                         (%bfs new-nodes))))
+                   (%move-from (node acc)
+                     (let ((node1 (gethash node prev)))
+                       (if (eq node1 t)
+                           acc
+                           (%move-from node1 (cons node acc))))))
+            (multiple-value-bind (path-found target)
+                (%bfs nodes)
+              (if path-found
+                  (%move-from target nil)
+                  nil)))))))
+
+(defun estimate-node-score (node claimed-mines distance-tab)
+  (loop
+     :for claimed-mine :in claimed-mines
+     :for val = (gethash (cons claimed-mine node) distance-tab)
+     :when val
+     :summing (* val val)))
+
+(defun build-full-network (graph distance-tab start-mine mines num-moves)
+  (let ((current-network (make-hash-table :test #'equal))
+        (move-num-tab (make-hash-table :test #'equal))
+        (mine-tab (make-hash-table :test #'equal))
+        (target-order nil)
+        (claimed-mines nil))
+    (loop :for mine :in mines
+       :do (setf (gethash mine mine-tab) t))
+    ;; (push start-mine claimed-mines)
+    ;; (push start-mine target-order)
+    ;; (setf (gethash start-mine current-network) t)
+    (setf (gethash start-mine move-num-tab) 0)
+    (labels ((%add-target (target)
+               (setf (gethash target current-network) t)
+               (push target target-order)
+               (when (gethash target mine-tab)
+                 (push target claimed-mines)
+                 (remhash target mine-tab)))
+             (%add-intermediate (node len)
+               (setf (gethash node current-network) t)
+               (setf (gethash node move-num-tab) len))
+             (%iter (move-num)
+               (let ((path (find-regions-connecting-move graph current-network mine-tab)))
+                 (cond ((null path)
+                        (%iter-non-targeted move-num))
+                       ((null (cdr path))
+                        (%add-target (car path))
+                        (%iter move-num))
+                       (t
+                        (let ((path-nodes (cdr path)))
+                          (loop :for node :in path-nodes
+                             :do (progn
+                                   (when (>= move-num num-moves)
+                                     (return-from %iter))
+                                   (%add-intermediate node move-num)
+                                   (incf move-num)))
+                          (%add-target (car (last path))))
+                        (%iter move-num)))))
+             (%iter-non-targeted (move-num)
+               (when (< move-num num-moves)
+                 (let ((move (find-best-non-targeted-move graph current-network distance-tab claimed-mines)))
+                   (when move
+                     (%add-intermediate (cdr move) move-num)
+                     (%iter-non-targeted (1+ move-num))))))
+             (%network-score ()
+               (let ((score 0))
+                 (maphash (lambda (node val)
+                            (declare (ignore val))
+                            (incf score (estimate-node-score node claimed-mines distance-tab)))
+                          current-network)
+                 score)))
+      (%iter 0)
+      (values (append
+               (reverse target-order)
+               ;; Add other mines
+               (alexandria:hash-table-keys mine-tab))
+              (%network-score)))))
+
+(defun find-best-mines-order (graph distance-tab mines num-moves)
+  (let ((max-score 0)
+        (best-order nil))
+    (loop :for mine :in mines
+       :do (multiple-value-bind (order score)
+               (build-full-network graph distance-tab mine mines num-moves)
+             (when (> score max-score)
+               (setf max-score score)
+               (setf best-order order))))
+    (or best-order
+        mines)))
+
+(defun find-best-non-targeted-move (graph current-network distance-tab claimed-mines)
+  (let ((max-move nil)
+        (max-dist 0))
+    (maphash (lambda (node val)
+               (declare (ignore val))
+               (let ((neighbour (any-neighbour graph node)))
+                 (when (and neighbour
+                            (null (gethash neighbour current-network)))
+                   (let ((dist (estimate-node-score neighbour claimed-mines distance-tab)))
+                     (when (> dist max-dist)
+                       (setf max-move (cons node neighbour)))))))
+             current-network)
+    max-move))
+
 (defmethod make-player ((player-class (eql 'connector-player)) &rest params)
   (declare (ignore params))
   (make-instance 'connector-player))
@@ -188,19 +340,22 @@
     (setf avail-graph (clone-graph (game-map state)))
     (setf current-network (make-hash-table :test #'equal))
     (let* ((mines (mines state))
-           (mine-scores
-            (loop :for mine :in mines
-               :collect
-               (cons mine
-                     (loop
-                        :for other-mine :in mines
-                        :for dist = (gethash (cons mine other-mine) (distance-tab state))
-                        :when dist
-                        :summing dist))))
-           (sorted (mapcar #'car
-                           (sort (copy-list mine-scores)
-                                 #'<
-                                 :key #'cdr))))
+           ;; (mine-scores
+           ;;  (loop :for mine :in mines
+           ;;     :collect
+           ;;     (cons mine
+           ;;           (loop
+           ;;              :for other-mine :in mines
+           ;;              :for dist = (gethash (cons mine other-mine) (distance-tab state))
+           ;;              :when dist
+           ;;              :summing dist))))
+           ;; (sorted (mapcar #'car
+           ;;                 (sort (copy-list mine-scores)
+           ;;                       #'<
+           ;;                       :key #'cdr)))
+           (sorted (find-best-mines-order avail-graph (distance-tab state)
+                                          mines (floor (length (map-rivers (setup-map setup-message)))
+                                                       (players-number state)))))
       (setf (mines player) sorted)
       (setf (starting-locations player)
             (mapcar (lambda (node)
@@ -246,24 +401,9 @@
                               (%do-move))
                              (t (make-claim state src trgt)))))
                    (%do-random-move)))
-             (%dist (node)
-               (loop
-                  :for claimed-mine :in claimed-mines
-                  :for val = (gethash (cons claimed-mine node) (distance-tab state))
-                  :when val
-                  :summing (* val val)))
              (%do-random-move ()
-               (let ((max-move nil)
-                     (max-dist 0))
-                 (maphash (lambda (node val)
-                            (declare (ignore val))
-                            (let ((neighbour (any-neighbour avail-graph node)))
-                              (when (and neighbour
-                                         (null (gethash neighbour current-network)))
-                                (let ((dist (%dist neighbour)))
-                                  (when (> dist max-dist)
-                                    (setf max-move (cons node neighbour)))))))
-                          current-network)
+               (let ((max-move (find-best-non-targeted-move avail-graph current-network
+                                                            (distance-tab state) claimed-mines)))
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
                      (%try-not-reached))))
