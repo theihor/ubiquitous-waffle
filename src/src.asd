@@ -11,10 +11,11 @@
                :src/decode
                :src/mcts
 
-               ;; :cl-rl
-               ;; :src/rl/player
-               ;; :src/rl/puntering
-               ;; :src/rl/run
+               :cl-rl
+               :src/rl/player
+               :src/rl/puntering
+               :src/rl/run
+               :src/rl/player-wrapper
                )
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)

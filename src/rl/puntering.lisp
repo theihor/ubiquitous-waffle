@@ -7,13 +7,15 @@
           :src/decode
           :src/rl/player
           :src/utils)
-  (:export #:puntering))
+  (:export #:puntering
+           #:message
+           #:make-move-from-action))
 
 (in-package :src/rl/puntering)
 
 (defclass puntering (markov-decision-process)
-  ((setup-message :initarg :setup-message
-                  :reader setup-message)))
+  ((message :initarg :message
+            :accessor message)))
 
 (defmethod possible-actions ((p puntering) player-state)
   (alexandria:hash-table-keys (group->edges player-state)))
@@ -32,52 +34,49 @@
     move))
 
 (defmethod perform-action ((p puntering) player-state action)
-  (format t "performing ~A~%" action)
+  "Update player-state using (message p)"
+  (declare (ignore action))
   (let* ((prev-score (score (state player-state)))
-         (move (make-move-from-action player-state action)))
-    (update-player player-state (list move))
-    (values player-state (- (score (state player-state))
-                            prev-score))))
+         ;; (move (make-move-from-action player-state action))
+         (next-state (clone-player player-state)))
+    ;; (format t "performing ~A: ~A~%" action move)
+    (update-player next-state (message p))
+    (let* ((reward (- (score (state next-state))
+                      prev-score))
+           (reward (if (= 0 reward) -0.1 reward)))
+      (values next-state reward))))
 
 (defparameter *initial-state* nil)
 
 (defmethod initial-state ((p puntering))
   (or *initial-state*
       (let ((player-state (make-player 'rl-player)))
-        (init-player player-state (setup-message p))
+        (init-player player-state (message p))
         (setf *initial-state* player-state))))
 
 (defmethod terminal-state? ((p puntering) player-state)
   (= 0 (hash-table-count (edge->group player-state))))
 
 (defmethod state-features ((p puntering) player-state)
-  (let ((total 0)
-        (lst nil))
-    (maphash (lambda (g edges)
-               (declare (ignore g))
-               (push (length edges) lst)
-               (incf total (length edges)))
-             (group->edges player-state))
-    (mapcar (if (= 0 total)
-                (constantly 0)
-                (lambda (n) (/ n total)))
-            lst)))
+  (with-slots (group->edges) player-state
+    (let* ((total 0)
+           (lst (loop :for i :from 0 :below *groups-n* :collect
+                   (let ((n (length (gethash i group->edges))))
+                     (incf total n)
+                     n))))
+      (mapcar (if (= 0 total)
+                  (constantly 0)
+                  (lambda (n) (/ n total)))
+              lst))))
 
 (defmethod estimate-action ((p puntering) player-state action)
   ;; (format t "estimating ~A~%" action)
   (let* ((prev-score (score (state player-state)))
          (move (make-move-from-action player-state action))
-         (new-state (copy-instance player-state
-                                   :state (clone-game (state player-state))
-                                   :avail-graph (clone-graph (avail-graph player-state))
-                                   :edge->group (copy-hash-table
-                                                 (edge->group player-state))
-                                   :group->edges (copy-hash-table
-                                                  (group->edges player-state)
-                                                  :val-copy-func #'copy-list)
-                                   )))
+         (new-state (clone-player player-state)))
     (update-player new-state (list move))
-    (list (list new-state (- (score (state new-state))
-                             prev-score)
-                1.0))))
+    (let* ((reward (- (score (state player-state))
+                      prev-score))
+           (reward (if (= 0 reward) -0.1 reward)))
+      (list (list new-state reward 1.0)))))
 

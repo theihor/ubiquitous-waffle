@@ -7,7 +7,8 @@
         :src/punter
         :src/game-state
         :src/graph
-        :src/mcts-player))
+        :src/mcts-player
+        :src/rl/player-wrapper))
 
 (in-package :src/main)
 
@@ -110,15 +111,17 @@
 		  (format t "~A~%" move-or-stop-or-timeout)
 		  (cond
 		    ((typep m 'stop)
-                     (progn
-                       (format t "Game stop.~%")
-                       (when (typep (state player) 'game-with-scores)
-                         (format t "Computed score:~%")
-                         (loop :for punter :below (players-number (state player))
-                            :do (format t "~A :~A~%"
-                                        punter
-                                        (score (elt (punters (state player)) punter)))))
-                       (return)))
+             (progn
+               (format t "Game stop.~%")
+               (when (typep (state player) 'game-with-scores)
+                 (format t "Computed score:~%")
+                 (loop :for punter :below (players-number (state player))
+                    :do (format t "~A :~A~%"
+                                punter
+                                (score (elt (punters (state player)) punter)))))
+               (when (typep player 'src/rl/player-wrapper::rl-player-wrapper)
+                 (src/rl/player-wrapper::dump-theta-to-file player "~/theta.txt"))
+               (return)))
 		    ((typep (car m) 'move)
 		     (progn
                        (update-player player m)

@@ -2,11 +2,14 @@
     (:use :common-lisp
           :src/game-player
           :src/graph
-          :src/game-state)
+          :src/game-state
+          :src/utils)
   (:export #:edge->group
            #:group->edges
            #:avail-graph
-           #:rl-player))
+           #:rl-player
+           #:*groups-n*
+           #:clone-player))
 
 (in-package :src/rl/player)
 
@@ -51,7 +54,7 @@
                    (< score min-edge-score))
            (setf min-edge-score score)))))
     
-    (format t "min: ~A; max: ~A~%" min-edge-score max-edge-score)
+    ;; (format t "min: ~A; max: ~A~%" min-edge-score max-edge-score)
     
     (setf (group->edges player-state) (make-hash-table :test #'equal))
     (setf (edge->group player-state) (make-hash-table :test #'equal))
@@ -68,7 +71,7 @@
       (maphash (lambda (edge gr)
                  (push edge (gethash gr (group->edges player-state))))
                (edge->group player-state)))
-     (maphash (lambda (g e) (format t "~A: ~A~%" g e)) (group->edges player-state))
+     ;; (maphash (lambda (g e) (format t "~A: ~A~%" g e)) (group->edges player-state))
     ))
 
 (defmethod init-player ((player rl-player) setup-message)
@@ -96,4 +99,12 @@
        ;; (compute-edge-groups player)
        ))))
 
-
+(defun clone-player (player-state)
+  (copy-instance player-state
+                 :state (clone-game (state player-state))
+                 :avail-graph (clone-graph (avail-graph player-state))
+                 :edge->group (copy-hash-table
+                               (edge->group player-state))
+                 :group->edges (copy-hash-table
+                                (group->edges player-state)
+                                :val-copy-func #'copy-list)))

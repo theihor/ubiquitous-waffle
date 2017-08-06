@@ -14,11 +14,13 @@
    (mine->sites :initform (make-hash-table :test #'eq)
                 :accessor mine->sites
                 :type hash-table
+                :initarg :mine->sites
                 :documentation "Table of kind mine -> { site -> t }")
    
    (site->mines :initform (make-hash-table :test #'eq)
                 :accessor site->mines
                 :type hash-table
+                :initarg :site->mines
                 :documentation "Table of kind site -> { mine -> t }")
    (graph :initarg :graph
           :accessor punter-graph
@@ -47,7 +49,16 @@
 (defgeneric claim-edge (punter node1 node2 distance-tab))
 
 (defmethod claim-edge ((p punter) node1 node2 distance-tab)
+  ;; (format t "claiming ~A ~A~% "
+  ;;         node1 node2 )
+  
   (with-slots (mine->sites site->mines graph) p
+    ;; (format t "site->mines~%")
+    ;; (maphash (lambda (s ms) (format t "~A <- ~A~%" s (alexandria:hash-table-keys ms)))
+    ;;          site->mines)
+    ;; (format t "mine->sites~%")
+    ;; (maphash (lambda (m ss) (format t "~A -> ~A~%" m (alexandria:hash-table-keys ss)))
+    ;;          mine->sites)
     (labels ((%node-reachable? (mine node)
                (gethash node (gethash mine mine->sites)))
              (%add-node (mine node)
@@ -69,7 +80,9 @@
       (maphash (lambda (mine val)
                  (declare (ignore val))
                  (incf (score p) (%add-node mine node1)))
-               (gethash node2 site->mines))))
+               (gethash node2 site->mines))
+      ;; (format t "new score: ~A~%" (score p))
+      ))
   p)
 
 (defun estimate-score (punter node1 node2 distance-tab)

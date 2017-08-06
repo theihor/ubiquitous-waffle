@@ -7,7 +7,7 @@
 (in-package :src/rl/run)
 
 (defun run-punter-totd-lambda-solver (setup-message &key (alpha 0.4) (gamma 0.99) (td-lambda 0.8) (agent nil))
-  (let* ((problem (make-instance 'puntering :setup-message setup-message))
+  (let* ((problem (make-instance 'puntering :message setup-message))
          (agent (or agent
                     (cl-rl::make-totd-lambda-agent
                      problem :alpha alpha :gamma gamma :td-lambda td-lambda))))
@@ -24,5 +24,6 @@
                                        (format t "reward: ~A; total-reward: ~A~%"
                                                reward total-reward)
                                        (maphash (lambda (g e) (format t "~A: ~A~%" g e)) (group->edges state))
+                                       ;; (format  t "theta: ~A~%" (cl-rl::agent-theta agent))
                                        ))
     agent))
