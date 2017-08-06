@@ -278,9 +278,11 @@
 
 (defun main-simulator-aux (botlist)
   (let* ((*logger-name* "simulator")
-         (botloop (mapcar (lambda (name)
+         (*random-state* (make-random-state t))
+         (botlist (mapcar (lambda (name)
                             (make-instance 'bot :program-name name))
                           botlist))
+         (botloop (copy-list botlist))
          (game-map (parse-map (get-random-map-json)))
          (rivers (length (map-rivers game-map)))
 
@@ -316,9 +318,9 @@
            (debug-log "Shook hands with ~a~%" name)
            (write-to-bot bot "~A" (encode-you id))
            ;; setup or continue
-           (if (gethash id player-table)
-               (progn
-                 (handler-case
+           (handler-case
+               (if (gethash id player-table)
+                   (progn 
                      (progn
                        ;; send current moves and state
                        (write-to-bot bot (let* ((*yason-lisp-readable-encode* nil))
@@ -328,18 +330,20 @@
                            (parse-move-with-state (read-from-bot bot))
                          (setf (gethash id player-table) state)
                          (push move moves)))
-                   (error (e) (debug-log "ERROR: ~A~%" e)))
-                 (incf steps))
-               (progn
-                 (debug-log "Performing setup...~%")
-                 (write-to-bot bot
-                               (encode-setup (make-setup id (length botlist) game-map)))
-                 ;; (debug-log "Sent: ~A~%" (encode-setup (make-setup id (length botlist) game-map)))
-                 (setf (gethash id player-table)
-                       (parse-ready (read-from-bot bot)))
-                 (setf (setupped bot) t)))))
+                     (incf steps))
+                   (progn
+                     (debug-log "Performing setup...~%")
+                     (write-to-bot bot
+                                   (encode-setup (make-setup id (length botlist) game-map)))
+                     ;; (debug-log "Sent: ~A~%" (encode-setup (make-setup id (length botlist) game-map)))
+                     (setf (gethash id player-table)
+                           (parse-ready (read-from-bot bot)))
+                     (setf (setupped bot) t)))          
+             (error (e) (debug-log "ERROR: ~A~%" e)))
+           ))
        :finally
        (dolist (bot botlist)
+         (restart-bot bot)
          ;; perform handshake
          (let ((name (parse-me (read-from-bot bot)))
                (id (id bot)))
