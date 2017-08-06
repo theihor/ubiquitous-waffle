@@ -115,15 +115,40 @@
 
 ;; Connector player
 
+(defclass location ()
+  ((kind :initarg :kind
+         :accessor kind)
+   (node :initarg :node
+         :accessor node)
+   (data :initarg :data
+         :accessor data
+         :initform nil)))
+
+(defun make-location (kind node &optional data)
+  (make-instance 'location
+                 :kind kind
+                 :node node
+                 :data data))
+
+(defun mine-location? (location)
+  (eq (kind location) :mine))
+
 (defclass connector-player (game-player)
   ((avail-graph :accessor avail-graph
                 :initform nil)
    (current-network :accessor current-network
                     :initform nil)
+   ;; TODO: remove when future-player is fixed
    (mines :accessor mines
           :initform nil)
    (claimed-mines :accessor claimed-mines
-                  :initform nil)))
+                  :initform nil)
+   (locations :accessor locations
+              :initform nil)
+   (starting-locations :accessor starting-locations
+                       :initform nil)
+   (not-reached-locations :accessor not-reached-locations
+                          :initform nil)))
 
 (defun find-connecting-move (graph current-network target)
   (if (gethash target current-network)
@@ -176,10 +201,14 @@
                            (sort (copy-list mine-scores)
                                  #'<
                                  :key #'cdr))))
-      (setf (mines player) sorted))))
+      (setf (mines player) sorted)
+      (setf (starting-locations player)
+            (mapcar (lambda (node)
+                      (make-location :mine node))
+                    sorted)))))
 
 (defmethod update-player :after ((player connector-player) moves)
-  (with-slots (current-network avail-graph state mines) player
+  (with-slots (current-network avail-graph state) player
     (mapc-claims
      moves
      (lambda (id src trgt)
@@ -188,19 +217,32 @@
          (setf (gethash src current-network) t)
          (setf (gethash trgt current-network) t))))))
 
+(defun extract-first (list predicate &optional acc)
+  (if (null list)
+      (values nil (reverse acc))
+      (if (funcall predicate (car list))
+          (values (car list) (append (reverse acc) (cdr list)))
+          (extract-first (cdr list) predicate (cons (car list) acc)))))
+
 (defmethod select-move ((player connector-player))
-  (with-slots (avail-graph current-network mines state claimed-mines) player
-    (labels ((%do-move ()
-               (if mines
-                   (let ((next-mine (car mines)))
+  (with-slots (avail-graph current-network locations
+                           starting-locations state claimed-mines
+                           not-reached-locations)
+      player
+    (labels ((%claim (location)
+               (when (mine-location? location)
+                 (push (node location) claimed-mines)))
+             (%do-move ()
+               (if locations
+                   (let ((next-location (car locations)))
                      (multiple-value-bind (src trgt)
-                         (find-connecting-move avail-graph current-network next-mine)
+                         (find-connecting-move avail-graph current-network (node next-location))
                        (cond ((or (eq src t)
                                   (eq src nil))
-                              (if (eq src t)
-                                  (let ((claimed-mine (pop mines)))
-                                    (push claimed-mine claimed-mines))
-                                  (pop mines))
+                              (let ((claimed-location (pop locations)))
+                                (if (eq src t)
+                                    (%claim claimed-location)
+                                    (push claimed-location not-reached-locations)))
                               (%do-move))
                              (t (make-claim state src trgt)))))
                    (%do-random-move)))
@@ -224,14 +266,35 @@
                           current-network)
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
-                     (%do-totally-random-move))))
+                     (%try-not-reached))))
+             (%try-not-reached ()
+               (if not-reached-locations
+                   (progn
+                     (%init-locations (reverse not-reached-locations))
+                     (setf not-reached-locations nil)
+                     (%do-move))
+                   (%do-totally-random-move)))
              (%do-totally-random-move ()
                (let ((node (any-node avail-graph)))
                  (if node
                      (make-claim state node (any-neighbour avail-graph node))
-                     (make-pass state)))))
+                     (make-pass state))))
+             (%filter-locs (locs)
+               (remove-if-not
+                (lambda (loc)
+                  (any-neighbour avail-graph (node loc)))
+                locs))
+             (%init-locations (locs)
+               (let ((alive-locs (%filter-locs locs)))
+                 (multiple-value-bind (first-loc other-locs)
+                     (extract-first alive-locs #'mine-location?)
+                   (if first-loc
+                       (progn
+                         (setf (gethash (node first-loc) current-network) t)
+                         (%claim first-loc)
+                         (setf locations other-locs))
+                       ;; Oops
+                       (setf locations nil))))))
       (when (= (hash-table-count current-network) 0)
-        (let ((first-mine (pop mines)))
-          (setf (gethash first-mine current-network) t)
-          (push first-mine claimed-mines)))
+        (%init-locations starting-locations))
       (%do-move))))
