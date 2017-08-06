@@ -41,7 +41,23 @@ function show_history_file() {
             opt.value = value;
             player_selector.add(opt, null);
         }
-        
+
+	if (json.punter != null) { 
+	    player_selector.selectedIndex = json.punter + 1;
+            
+	    var div = document.getElementById("punter_info");
+	    div.innerHTML = json.punter;
+	    div = document.getElementById("total_score_info");
+	    div.innerHTML = JSON.stringify(json.scores);
+	    if (json.scores) {
+		json.scores.forEach(function (score) {
+		    if (score.punter == json.punter) {
+			div = document.getElementById("punter_score_info");
+			div.innerHTML = score.scores;
+		    }
+		});
+	    }
+	}
         if (document.cy)
             document.cy.destroy();
         var cy = cytoscape({
@@ -77,54 +93,56 @@ function show_history_file() {
                 node.style("height", mine_size);
             });
         });
-	json.futures.forEach(function (future) {
-            cy.nodes("#node_" + future.target).forEach(function(node) {
-                node.style("background-color", "orange");
-                node.style("width", mine_size);
-                node.style("height", mine_size);
-            });
-	    cy.add([
-                { group: "edges",
-                  data: { id: "future_" + future.source + "_" + future.target,
-                          source: "node_" + future.source,
-                          target: "node_" + future.target,
-                        }
-                }
-            ]);
-	    cy.edges("#future_" + future.source + "_" + future.target)
-		.forEach(function(edge) {
-		    edge.style("line-color", "blue");
-		    edge.style("opacity", "0.2");
-		    edge.style("z-index", 0);
+	if (json.futures != null) {
+	    json.futures.forEach(function (future) {
+		cy.nodes("#node_" + future.target).forEach(function(node) {
+                    node.style("background-color", "orange");
+                    node.style("width", mine_size);
+                    node.style("height", mine_size);
 		});
-		    
-        });
-	cy.on('mouseover', 'node', function(evt){
-	    var node = evt.target;
-	    json.futures.forEach(function (future) {
-		if (("node_" + future.source) == node.id()) {
-		    cy.edges("#future_" + future.source + "_" + future.target)
-			.forEach(function(edge) {
-			    edge.style("line-color", "blue");
-			    edge.style("opacity", "1");
-			    edge.style("z-index", 0);
-			});
-		}
+		cy.add([
+                    { group: "edges",
+                      data: { id: "future_" + future.source + "_" + future.target,
+                              source: "node_" + future.source,
+                              target: "node_" + future.target,
+                            }
+                    }
+		]);
+		cy.edges("#future_" + future.source + "_" + future.target)
+		    .forEach(function(edge) {
+			edge.style("line-color", "blue");
+			edge.style("opacity", "0.2");
+			edge.style("z-index", 0);
+		    });
+		
+            });
+	    cy.on('mouseover', 'node', function(evt){
+		var node = evt.target;
+		json.futures.forEach(function (future) {
+		    if (("node_" + future.source) == node.id()) {
+			cy.edges("#future_" + future.source + "_" + future.target)
+			    .forEach(function(edge) {
+				edge.style("line-color", "blue");
+				edge.style("opacity", "1");
+				edge.style("z-index", 0);
+			    });
+		    }
+		});
 	    });
-	});
-	cy.on('mouseout', 'node', function(evt){
-	    var node = evt.target;
-	    json.futures.forEach(function (future) {
-		if (("node_" + future.source) == node.id()) {
-		    cy.edges("#future_" + future.source + "_" + future.target)
-			.forEach(function(edge) {
-			    edge.style("line-color", "blue");
-			    edge.style("opacity", "0.2");
-			    edge.style("z-index", 0);
-			});
-		}
+	    cy.on('mouseout', 'node', function(evt){
+		var node = evt.target;
+		json.futures.forEach(function (future) {
+		    if (("node_" + future.source) == node.id()) {
+			cy.edges("#future_" + future.source + "_" + future.target)
+			    .forEach(function(edge) {
+				edge.style("line-color", "blue");
+				edge.style("opacity", "0.2");
+				edge.style("z-index", 0);
+			    });
+		    }
+		});
 	    });
-	});
+	}
 	cy.fit();
 
         document.timestamp = 0;
@@ -133,14 +151,22 @@ function show_history_file() {
             [ "GoldenRod",
               "DarkTurquoise",
               "DarkMagenta",
-              "Blue",
+              "Navy",
               
               "Coral",
               "DeepPink",
               "Indigo",
               "LightSeaGreen",
+
+	      "Blue",
+	      "LawnGreen",
+	      "Brown",
+	      "Yellow"
             ];
         document.palette = document.default_palette;
+
+	history_max();
+	show_player();
     };
     reader.readAsText(file);
 }
