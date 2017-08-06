@@ -93,28 +93,38 @@ function show_history_file() {
 	    cy.edges("#future_" + future.source + "_" + future.target)
 		.forEach(function(edge) {
 		    edge.style("line-color", "blue");
-		    edge.style("opacity", "0.3");
+		    edge.style("opacity", "0.2");
 		    edge.style("z-index", 0);
 		});
 		    
         });
-	// cy.on('mouseover', 'node', function(evt){
-	//     var node = evt.target;
-	//     console.log('mouseover ' + node.id());
-	//     json.futures.forEach(function (future) {
-	// 	if (future.source == node.id()) {
-	// 	    cy.edges("#future_" + future.source + "_" + future.target)
-	// 		.forEach(function(edge) {
-	// 		    edge.style("line-color", "blue");
-	// 		    edge.style("opacity", "0.2");
-	// 		    edge.style("z-index", 0);
-	// 		});
-	// 	}
-	//     });
-	// });
-	
-
-        cy.fit();
+	cy.on('mouseover', 'node', function(evt){
+	    var node = evt.target;
+	    json.futures.forEach(function (future) {
+		if (("node_" + future.source) == node.id()) {
+		    cy.edges("#future_" + future.source + "_" + future.target)
+			.forEach(function(edge) {
+			    edge.style("line-color", "blue");
+			    edge.style("opacity", "1");
+			    edge.style("z-index", 0);
+			});
+		}
+	    });
+	});
+	cy.on('mouseout', 'node', function(evt){
+	    var node = evt.target;
+	    json.futures.forEach(function (future) {
+		if (("node_" + future.source) == node.id()) {
+		    cy.edges("#future_" + future.source + "_" + future.target)
+			.forEach(function(edge) {
+			    edge.style("line-color", "blue");
+			    edge.style("opacity", "0.2");
+			    edge.style("z-index", 0);
+			});
+		}
+	    });
+	});
+	cy.fit();
 
         document.timestamp = 0;
         document.moves = json.moves;
