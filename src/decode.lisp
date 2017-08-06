@@ -43,12 +43,20 @@
    'pass
    :punter (gethash "punter" pass-ht)))
 
+(defun parse-splurge (splurge-ht)
+  (make-instance
+   'splurge
+   :punter (gethash "punter" splurge-ht)
+   :route (gethash "route" splurge-ht)))
+
 (defun parse-move (move-ht)
   (acond
     ((gethash "claim" move-ht)
      (parse-claim it))
     ((gethash "pass" move-ht)
      (parse-pass it))
+    ((gethash "splurge" move-ht)
+     (parse-splurge it))
     (t (error "unknown type of move"))))
 
 (defun parse-moves-inner (moves-ht)
@@ -79,7 +87,8 @@
   (make-instance
    'settings
    :futures (when settings-ht
-              (gethash "futures" settings-ht))))
+              (gethash "futures" settings-ht)
+              (gethash "splurges" settings-ht))))
 
 (defun parse-setup-inner (setup-ht)
   (make-instance

@@ -19,6 +19,8 @@
            #:claim-source
            #:claim-target
            #:pass
+           #:splurge
+           #:splurge-route
            #:stop
            #:stop-moves
            #:stop-scores
@@ -42,7 +44,8 @@
    (setting :initarg :settings :accessor setup-settings :initform nil)))
 
 (defclass settings ()
-  ((futures :initarg :futures :accessor settings-futures)))
+  ((futures :initarg :futures :accessor settings-futures)
+   (splurges :initarg :splurges :accessor settings-splurges)))
 
 (defclass future ()
   ((source :initarg :source :accessor future-source)
@@ -70,6 +73,9 @@
   (format s "~A->~A" (claim-source c) (claim-target c)))
 
 (defclass pass (move) ())
+
+(defclass splurge (move)
+  ((route :initarg :route :accessor splurge-route)))
 ;;;
 
 (defclass stop ()
