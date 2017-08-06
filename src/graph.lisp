@@ -1,6 +1,6 @@
 (uiop:define-package :src/graph
     (:nicknames :graph)
-  (:use :common-lisp)
+  (:use :common-lisp :src/utils)
   (:import-from :alexandria)
   (:export #:add-edge
            #:get-edge
@@ -17,7 +17,8 @@
            #:num-edges
            #:num-nodes
            #:graph-edges
-           #:mapc-all-edges))
+           #:mapc-all-edges
+           #:get-nodes))
 
 (in-package :src/graph)
 
@@ -47,6 +48,8 @@
   (:documentation "Return any node of the graph that has edges"))
 (defgeneric mapc-all-edges (graph func)
   (:documentation "Maps all edges of graph with params (source target data)"))
+(defgeneric get-nodes (graph)
+  (:documentation "Returns all nodes in form of hash-table of kind node -> t"))
 
 (defun check-nodes (graph &rest node-nums)
   (with-slots (num-nodes) graph
@@ -185,6 +188,10 @@ Nil when there is no neighbours."
       (make-instance
        'hash-graph
        :edges tab))))
+
+(defmethod get-nodes ((graph hash-graph))
+  (copy-hash-table (graph-edges graph)
+                   :val-copy-func (constantly t)))
 
 (defmethod graph->dot ((graph hash-graph) file &key (edge-label nil) (node-label nil))
   (with-open-file (s file
