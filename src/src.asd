@@ -9,7 +9,12 @@
                :src/bfs
                :src/game-player
                :src/decode
-               :src/mcts)
+               :src/mcts
+
+               :cl-rl
+               :src/rl/player
+               :src/rl/puntering
+               :src/rl/run)
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)
                               (asdf:load-op :src/test/game-player)))
