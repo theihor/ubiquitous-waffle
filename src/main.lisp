@@ -183,7 +183,7 @@
 
   (let ((stdin *standard-input*)
         ;; (stdout *standard-output*)
-        (player (make-player 'connector-player))
+        (player (make-player 'connector-player :gambling t :tricky t))
         (*package* (find-package :src/main)))
     
     (debug-log "Sending me...~%")
@@ -194,7 +194,10 @@
     (let ((msg (read-with-size stdin)))
       (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
-        (cond 
+        (cond
+          ((numberp m)
+           (debug-log "Failed with timeout ~A~%" m)
+           t)
           ((typep m 'setup)
            (debug-log "Init new player.~%")
            (init-player player m)
