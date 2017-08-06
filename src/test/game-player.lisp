@@ -78,6 +78,25 @@
                        (make-instance 'river :source 1 :target 3)
                        (make-instance 'river :source 3 :target 5)))))
 
+(defun sample-setup-message-4 ()
+  (make-instance
+   'setup
+   :punter 0
+   :punters 1
+   :map (make-instance
+         'game-map
+         :sites '(0 1 2 3 4 5 6 7)
+         :mines (list 1 5)
+         :rivers (list (make-instance 'river :source 0 :target 1)
+                       (make-instance 'river :source 1 :target 2)
+                       (make-instance 'river :source 2 :target 3)
+                       (make-instance 'river :source 4 :target 5)
+                       (make-instance 'river :source 5 :target 6)
+                       (make-instance 'river :source 6 :target 7)
+
+                       (make-instance 'river :source 7 :target 5)
+                       (make-instance 'river :source 1 :target 3)))))
+
 (defun check-move (player func)
   (let ((move (select-move player)))
     (funcall func move)
@@ -164,7 +183,8 @@
   (let ((player (apply #'make-player player-params)))
     (labels ((%run ()
                (let ((move (select-move player)))
-                 (format t "Score: ~A~%" (score (elt (punters (state player)) 0)))
+                 (when (typep (state player) 'game-with-scores)
+                   (format t "Score: ~A~%" (score (elt (punters (state player)) 0))))
                  (format t "Move : ~A~%" (encode-move move))
                  (if (typep move 'pass)
                      nil
