@@ -33,6 +33,16 @@
       (awhen (move-state obj)
         (yason:encode-object-element "state" it)))))
 
+(defmethod yason:encode ((obj splurge) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:with-object-element ("splurge")
+        (yason:with-object ()
+          (yason:encode-object-element "punter" (move-punter obj))
+          (yason:encode-object-element "route" (splurge-route obj))))
+      (awhen (move-state obj)
+        (yason:encode-object-element "state" it)))))
+
 (defmethod yason:encode ((obj future) &optional stream)
   (yason:with-output (stream)
     (yason:with-object ()
