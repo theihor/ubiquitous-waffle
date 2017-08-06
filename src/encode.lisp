@@ -43,6 +43,23 @@
       (awhen (move-state obj)
         (yason:encode-object-element "state" it)))))
 
+(defmethod yason:encode ((obj game-map) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:with-object-element ("sites")
+        (yason:with-array ()
+          (loop :for site :in (map-sites obj) :do
+             (yason:with-object ()
+               (yason:encode-object-element "id" site))))) 
+      (yason:encode-object-element "rivers" (map-rivers obj))
+      (yason:encode-object-element "mines" (map-mines obj)))))
+
+(defmethod yason:encode ((obj river) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:encode-object-element "source" (river-source obj))
+      (yason:encode-object-element "target" (river-target obj)))))
+
 (defmethod yason:encode ((obj future) &optional stream)
   (yason:with-output (stream)
     (yason:with-object ()
@@ -51,7 +68,6 @@
 
 (defun encode-msg (json-msg)
   (format nil "~a:~a" (length json-msg) json-msg))
-
 
 (defun encode-me (name)
   (encode-msg
@@ -70,7 +86,12 @@
 (defun encode-setup (setup)
   (encode-msg
    (with-output-to-string (stream)
-     (yason:encode setup stream))))
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "punter" (setup-punter setup))
+         (yason:encode-object-element "punters" (setup-punters setup))
+         (yason:encode-object-element "map" (setup-map setup))
+         (yason:encode-object-element "settings" (setup-settings setup)))))))
 
 (defun encode-ready (punter-id &key futures state)
   (encode-msg
