@@ -9,7 +9,8 @@
            #:parse-move-with-state
            #:parse-stop
            #:parse-map
-           #:total-parse))
+           #:total-parse
+           #:parse-map-from-file))
 
 (declaim (optimize (debug 3) (safety 3)))
 

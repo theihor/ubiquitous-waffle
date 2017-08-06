@@ -189,7 +189,7 @@
 
   (let ((stdin *standard-input*)
         ;; (stdout *standard-output*)
-        (player (make-player 'connector-player :gambling t :tricky t))
+        (player (make-player 'connector-player :gambling t :tricky nil))
         (*package* (find-package :src/main)))
     
     (debug-log "Sending me...~%")
@@ -276,14 +276,16 @@
   (let ((*standard-output* (sb-ext:process-input (process bot))))
     (apply #'format-std str args)))
 
-(defun main-simulator-aux (botlist)
+(defun main-simulator-aux (botlist &key map-file)
   (let* ((*logger-name* "simulator")
          (*random-state* (make-random-state t))
          (botlist (mapcar (lambda (name)
                             (make-instance 'bot :program-name name))
                           botlist))
          (botloop (copy-list botlist))
-         (game-map (parse-map (get-random-map-json)))
+         (game-map (if map-file
+                       (parse-map-from-file map-file)
+                       (parse-map (get-random-map-json))))
          (rivers (length (map-rivers game-map)))
 
          (player-table (make-hash-table :test #'equal)) 
@@ -321,13 +323,20 @@
            (handler-case
                (if (gethash id player-table)
                    (progn 
-                     (progn
-                       ;; send current moves and state
-                       (write-to-bot bot (let* ((*yason-lisp-readable-encode* nil))
-                                           (encode-moves moves (gethash id player-table))))
+                     (let* ((*yason-lisp-readable-encode* nil)
+                            (*trace-output* *error-output*)
+                            (encoded-moves
+                             (encode-moves moves (gethash id player-table)))
+                            (response 0))
+                       (trivial-timeout:with-timeout (1)
+                         (time
+                          (progn
+                            ;; send current moves and state
+                            (write-to-bot bot encoded-moves)
+                            (setf response (read-from-bot bot)))))
                        ;; get next move
                        (multiple-value-bind (move state)
-                           (parse-move-with-state (read-from-bot bot))
+                           (parse-move-with-state response)
                          (setf (gethash id player-table) state)
                          (push move moves)))
                      (incf steps))
@@ -355,4 +364,9 @@
 
 (defun main-simulator ()
   (when sb-ext:*posix-argv*
-    (main-simulator-aux (cdr (apply-argv:parse-argv* sb-ext:*posix-argv*)))))
+    (let* ((args (apply-argv:parse-argv (cdr sb-ext:*posix-argv*)))
+           (programs (first args)))
+      (main-simulator-aux programs
+                          :map-file (awhen (getf (cdr args) :map-file) it))
+      )))
+
