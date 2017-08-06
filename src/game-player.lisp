@@ -253,7 +253,7 @@
                    (%move-from (node acc)
                      (let ((node1 (gethash node prev)))
                        (if (eq node1 t)
-                           acc
+                           (cons node acc)
                            (%move-from node1 (cons node acc))))))
             (multiple-value-bind (path-found target)
                 (%bfs nodes)
@@ -340,7 +340,7 @@
                  ;;         (reverse target-order) claimed-mines score)
                 score))
              (%moves-cap ()
-               (floor (* 0.8 num-moves)))
+               (floor (* 0.5 num-moves)))
              (%gamble ()
                (let ((futures nil))
                  (loop :for mine :in claimed-mines
@@ -492,7 +492,8 @@
                                      (< freedom 5))
                             (multiple-value-bind (src trgt)
                                 (extend-cluster avail-graph (cluster location))
-                              (format t "Location: ~A, freedom: ~A, extending: ~A -> ~A~%" (node location))
+                              ;; (format t "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
+                              ;;         (node location) freedom src trgt)
                               (return-from %tricky-check-locations (make-claim state src trgt)))))))
                (%do-move-tricky))
              (%do-move ()
@@ -514,6 +515,9 @@
                    (let ((next-location (car locations)))
                      (let ((path
                             (find-regions-connecting-move avail-graph current-network (cluster next-location))))
+                       ;; (format t "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
+                       ;;         (alexandria:hash-table-keys (cluster next-location))
+                       ;;         path)
                        (cond ((or (null path)
                                   (null (cdr path)))
                               (let ((claimed-location (pop locations)))
