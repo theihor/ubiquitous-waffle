@@ -23,6 +23,7 @@ function show_history_file() {
             var punter = null;
             if ("claim" in move) punter = move.claim.punter;
             if ("pass" in move) punter = move.pass.punter;
+	    if ("splurge" in move) punter = move.splurge.punter;
             if (punter != null && players.indexOf(punter) === -1)
                 players.push(punter);
         }
@@ -150,6 +151,8 @@ function history_forward() {
         update_move_info(move);
         if ("claim" in move)
             mark_taken(move.claim)
+	if ("splurge" in move)
+	    mark_splurge_taken(move.splurge);
         document.timestamp++;
     } else {
         update_move_info(null);
@@ -163,7 +166,9 @@ function history_backward() {
         var move = document.moves[document.timestamp];
         update_move_info(move);
         if ("claim" in move)
-            mark_free(move.claim)
+            mark_free(move.claim);
+	if ("splurge" in move)
+	    mark_splurge_free(move.splurge);
     } else {
         update_move_info(null);
     }
@@ -220,6 +225,12 @@ function update_move_info(move) {
     div.innerHTML = JSON.stringify(move);
 }
 
+function pairwise(arr, func){
+    for(var i=0;i<arr.length-1;i++){
+        func(arr[i], arr[i+1])
+    }
+}
+
 function mark_edge(edge, style) {
     document.cy.edges("#" + make_edge_id(edge.source, edge.target))
         .forEach(function(edge) {
@@ -234,6 +245,14 @@ function mark_free(claim) {
                      })
 }
 
+function mark_splurge_free(splurge) {
+    pairwise(splurge.route, function(current,next){
+	mark_edge({ "source" : current, "target" : next}, 
+		  { "line-color": "lightgray",
+		    "z-index": 10 });
+    });
+}
+
 function mark_taken(claim) {
     var palette = document.palette;
     var focus_player = parseInt(document.getElementById("player_selector").value);
@@ -242,7 +261,21 @@ function mark_taken(claim) {
         z_index = 30;
     mark_edge(claim, { "line-color": palette[claim.punter],
                        "z-index": z_index
-                     })
+                     });
+}
+
+function mark_splurge_taken(splurge) {
+    var palette = document.palette;
+    var focus_player = parseInt(document.getElementById("player_selector").value);
+    var z_index = 20;
+    if (focus_player == splurge.punter)
+        z_index = 30;
+    pairwise(splurge.route, function(current,next){
+	mark_edge({ "source" : current, "target" : next}, 
+		  { "line-color": palette[splurge.punter],
+                       "z-index": z_index 
+		  });
+    });
 }
 
 function history_reset() {
@@ -252,6 +285,8 @@ function history_reset() {
     for (var move of document.moves) {
         if ("claim" in move)
             mark_free(move.claim);
+	if ("splurge" in move)
+	    mark_splurge_free(move.splurge);
     }
 }
 
