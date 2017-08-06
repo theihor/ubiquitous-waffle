@@ -190,7 +190,8 @@
         (parse-stop-inner it))
        ((get-timeout json-ht)
         it))
-     (total-parse-inner (gethash "state" json-ht)))))
+     (total-parse-inner (gethash "state" json-ht))
+     json-ht)))
 
 (defun parse-map-from-file (map-file) 
   (with-open-file (stream map-file)

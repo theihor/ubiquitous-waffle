@@ -11,6 +11,11 @@
                :src/decode
                :src/mcts
                :src/simulator
+
+               ;; :cl-rl
+               ;; :src/rl/player
+               ;; :src/rl/puntering
+               ;; :src/rl/run
                )
   :in-order-to ((asdf:test-op (asdf:load-op :src/test/graph)
                               (asdf:load-op :src/test/game-state)

@@ -3,7 +3,8 @@
           :src/game-protocol
           :src/graph
           :src/punter
-          :src/bfs)
+          :src/bfs
+          :src/utils)
   (:export #:make-game-state
            #:process-moves
            #:game-map
@@ -15,7 +16,9 @@
            #:distance-tab
            #:dump-state
            #:game
-           #:game-with-scores))
+           #:game-with-scores
+           #:clone-game
+           #:score))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -23,7 +26,7 @@
 
 (defclass game ()
   ((game-map :initarg :game-map
-             :reader game-map)
+             :accessor game-map)
    (mines :initarg :mines
           :reader mines
           :type list)
@@ -38,6 +41,14 @@
                    :type integer)
    (distance-tab :accessor distance-tab
                  :documentation "Map (mine . target) -> distance")))
+
+(defgeneric clone-game (game))
+
+(defmethod clone-game (game)
+  (copy-instance game))
+
+(defmethod clone-game :after ((game game))
+  (setf (game-map game) (clone-graph (game-map game)) ))
 
 (defgeneric process-moves (state moves))
 (defgeneric dump-state (state moves))
@@ -104,6 +115,15 @@
                                              :mines (mines state)
                                              :sites (sites state))))))
 
+(defmethod clone-game :after ((state game-with-scores))
+  (setf (punters state)
+        (make-array (array-dimensions (punters state))
+                    :initial-contents (mapcar #'clone-punter (coerce (punters state) 'list)))))
+
+(defun clone-punter (punter)
+  (copy-instance punter
+                 :graph (clone-graph (punter-graph punter))))
+
 (defmethod process-moves ((state game-with-scores) moves)
   (let ((the-map (game-map state)))
     (mapc-claims
@@ -112,7 +132,10 @@
        (assert (eq (get-edge the-map src tgt) :free))
        (claim-edge (elt (punters state) id) src tgt (distance-tab state))
        (add-edge the-map src tgt id)))))
-  
+
+(defmethod score ((state game-with-scores))
+  (score (elt (punters state) (id state))))
+
 (defun dump-graph-with-distances (state file)
   (let ((rev-dist (make-hash-table :test #'equal)))
     (maphash (lambda (mine-node d)

@@ -6,7 +6,8 @@
            #:encode-ready
            #:encode-move
            #:encode-moves
-           #:encode-stop))
+           #:encode-stop
+           #:*yason-lisp-readable-encode*))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -40,6 +41,7 @@
 
 (defun encode-msg (json-msg)
   (format nil "~a:~a" (length json-msg) json-msg))
+
 
 (defun encode-me (name)
   (encode-msg
@@ -106,13 +108,17 @@
             (yason:encode-object-element
              (string slot-name) (slot-value obj slot-name))))))))
 
-(defmethod yason:encode ((obj hash-table) &optional stream)
-  (yason:with-output (stream)
-    (yason:with-object ()
-      (yason:encode-object-element
-       "__type" "HASH-TABLE")
-      (yason:encode-object-element
-       "content" (alexandria:hash-table-plist obj)))))
+(defparameter *yason-lisp-readable-encode* t)
+
+(defmethod yason:encode :around ((obj hash-table) &optional stream)
+  (if *yason-lisp-readable-encode*
+      (yason:with-output (stream)
+        (yason:with-object ()
+          (yason:encode-object-element
+           "__type" "HASH-TABLE")
+          (yason:encode-object-element
+           "content" (alexandria:hash-table-plist obj))))
+      (call-next-method)))
 
 (defmethod yason:encode ((obj cons) &optional stream)
   (yason:with-output (stream)
