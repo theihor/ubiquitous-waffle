@@ -23,7 +23,8 @@
    #:mines
    #:claimed-mines
    #:player-futures
-   #:futures))
+   #:futures
+   #:find-regions-connecting-move))
 
 (declaim (optimize (debug 0) (safety 0) (speed 0)))
 
@@ -34,7 +35,7 @@
           :initarg :state
           :initform nil)
    (futures :initarg :futures 
-	    :accessor player-futures)))
+            :accessor player-futures)))
 
 (defgeneric make-player (player-class &rest params))
 (defgeneric init-player (player setup-message))
