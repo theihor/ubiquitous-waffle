@@ -17,6 +17,29 @@ function show_history_file() {
         var node_size = (w > h ? w : h) / 20;
         var line_width = node_size * 0.5;
         var mine_size = node_size * 1.5;
+
+        var players = [ "all" ];
+        for (var move of json.moves) {
+            var punter = null;
+            if ("claim" in move) punter = move.claim.punter;
+            if ("pass" in move) punter = move.pass.punter;
+            if (punter != null && players.indexOf(punter) === -1)
+                players.push(punter);
+        }
+
+        document.players_number = players.length - 1;
+
+        var player_selector = document.getElementById("player_selector");
+
+        for(var i = player_selector.options.length - 1 ; i >= 0 ; i--)
+            player_selector.remove(i);
+
+        for (var value of players) {
+            var opt = document.createElement('option');
+            opt.text = value;
+            opt.value = value;
+            player_selector.add(opt, null);
+        }
         
         if (document.cy)
             document.cy.destroy();
@@ -55,16 +78,18 @@ function show_history_file() {
 
         document.timestamp = 0;
         document.moves = json.moves;
-        document.palette = [ "GoldenRod",
-                             "DarkTurquoise",
-                             "DarkMagenta",
-                             "Blue",
-                             
-                             "Coral",
-                             "DeepPink",
-                             "Indigo",
-                             "LightSeaGreen",
-                           ]
+        document.default_palette =
+            [ "GoldenRod",
+              "DarkTurquoise",
+              "DarkMagenta",
+              "Blue",
+              
+              "Coral",
+              "DeepPink",
+              "Indigo",
+              "LightSeaGreen",
+            ];
+        document.palette = document.default_palette;
     };
     reader.readAsText(file);
 }
@@ -73,14 +98,8 @@ function history_forward() {
     if (document.timestamp < document.moves.length) {
         var move = document.moves[document.timestamp];
         update_move_info(move);
-        if ("claim" in move) {
-            var claim = move.claim;
-            var cy = document.cy;
-            cy.edges("#" + make_edge_id(claim.source, claim.target))
-                .forEach(function(edge) {
-                    edge.style("line-color", document.palette[claim.punter]);
-                });
-        }
+        if ("claim" in move)
+            mark_taken(move.claim)
         document.timestamp++;
     } else {
         update_move_info(null);
@@ -93,14 +112,8 @@ function history_backward() {
         document.timestamp--;
         var move = document.moves[document.timestamp];
         update_move_info(move);
-        if ("claim" in move) {
-            var claim = move.claim;
-            var cy = document.cy;
-            cy.edges("#" + make_edge_id(claim.source, claim.target))
-                .forEach(function(edge) {
-                    edge.style("line-color", "lightgray");
-                });
-        }
+        if ("claim" in move)
+            mark_free(move.claim)
     } else {
         update_move_info(null);
     }
@@ -156,4 +169,66 @@ function update_move_info(move) {
     }
 
     div.innerHTML = JSON.stringify(move);
+}
+
+function mark_edge(edge, style) {
+    document.cy.edges("#" + make_edge_id(edge.source, edge.target))
+        .forEach(function(edge) {
+            for (var [key, val] of Object.entries(style))
+                edge.style(key, val);
+        });
+}
+
+function mark_free(claim) {
+    mark_edge(claim, { "line-color": "lightgray" })
+}
+
+function mark_taken(claim) {
+    var palette = document.palette;
+    mark_edge(claim, { "line-color": palette[claim.punter] })
+}
+
+function history_reset() {
+    document.timestamp = 0;
+    update_move_info(null);
+    update_time_info();
+    for (var move of document.moves) {
+        if ("claim" in move)
+            mark_free(move.claim);
+    }
+}
+
+function history_goto() {
+    var div = document.getElementById("history_goto");
+    history_goto_aux(parseInt(div.value));
+}
+
+function history_goto_aux(number) {
+    if (number < 0)
+        number = 0;
+    if (number > document.moves.length)
+        number = document.moves.length;
+
+    history_reset();
+    for (var i = 0; i < number; i++)
+        history_forward();
+}
+
+function history_max() {
+    history_goto_aux(document.moves.length);
+}
+
+function show_player() {
+    var selector = document.getElementById("player_selector");
+    var p = selector.value;
+    if (p == "all") {
+        document.palette = document.default_palette;
+    } else {
+        var palette = [];
+        for (var i = 0; i < document.players_number; ++i)
+            palette.push("DarkMagenta");
+        palette[p] = "GoldenRod";
+        document.palette = palette;
+    }
+    history_goto_aux(document.timestamp);
 }

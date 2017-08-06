@@ -77,6 +77,8 @@
 	  (when (game-log-futures *game-log*)
 	    (yason:encode-object-element "futures" (game-log-futures *game-log*))))))))
 
+(defparameter *verbose* t)
+
 ;;run example (main-online 9066 'cowboy-player)
 (defun main-online (port &rest player-params)
   (let ((socket (tcp-connect *punter-server* port))
@@ -101,18 +103,23 @@
 	     (init-player player s)
 
 	     ;; send ready
-	     (format t "Sending ready...~%")
-	     (tcp-send
-              socket
-              (encode-ready (setup-punter s)
-                            :futures (player-futures player)))
-	     (game-logger-setup setup-ht (player-futures player))
+             (format t "Sending ready...~%")
+             (let ((futures (player-futures player)))
+               (when *verbose*
+                 (format t "Bid on futures:")
+                 (mapcar #'yason:encode futures)
+                 (format t "~%"))
+               (tcp-send
+                socket
+                (encode-ready (setup-punter s)
+                              :futures futures)))
+         (game-logger-setup setup-ht (player-futures player))
 	     ;; loop for moves until stop
 	     (loop
 		;; get move
 		(let* ((move-or-stop-or-timeout (tcp-read socket))
 		       (m (parse move-or-stop-or-timeout)))
-		  (format t "~A~%" move-or-stop-or-timeout)
+		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
 		    ((typep m 'stop)
                      (progn
