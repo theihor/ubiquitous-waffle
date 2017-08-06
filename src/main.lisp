@@ -56,7 +56,11 @@
    (game-log-rev-moves :accessor game-log-rev-moves
                        :initform nil)
    (game-log-futures :accessor game-log-futures
-                       :initform nil)))
+                     :initform nil)
+   (game-log-scores :accessor game-log-scores
+                    :initform nil)
+   (game-log-punter :accessor game-log-punter
+                    :initform nil)))
 
 (defvar *game-log*)
 
@@ -67,6 +71,12 @@
 (defun game-logger-add-move (move)
   (push move (game-log-rev-moves *game-log*)))
 
+(defun game-logger-add-scores (scores)
+  (setf (game-log-scores *game-log*) scores))
+
+(defun game-logger-set-punter (punter)
+  (setf (game-log-punter *game-log*) punter))
+
 (defun game-logger-print (file-name)
   (let ((*yason-lisp-readable-encode* nil))
     (with-open-file (stream file-name :direction :output :if-exists :supersede :if-does-not-exist :create)
@@ -75,7 +85,9 @@
           (yason:encode-object-element "map" (game-log-map *game-log*))
           (yason:encode-object-element "moves" (reverse (game-log-rev-moves *game-log*)))
 	  (when (game-log-futures *game-log*)
-	    (yason:encode-object-element "futures" (game-log-futures *game-log*))))))))
+	    (yason:encode-object-element "futures" (game-log-futures *game-log*)))
+          (yason:encode-object-element "scores" (game-log-scores *game-log*))
+          (yason:encode-object-element "punter" (game-log-punter *game-log*)))))))
 
 (defparameter *verbose* t)
 
@@ -100,6 +112,7 @@
 	   (multiple-value-setq (s the-state setup-ht) (parse s))
 	   (when (and s (typep s 'setup))
 	     (format t "Getting setup... Punter:~A~%" (setup-punter s))
+             (game-logger-set-punter (setup-punter s))
 	     (init-player player s)
 
 	     ;; send ready
@@ -120,6 +133,8 @@
 		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
 		    ((typep m 'stop)
+                     (format t "stop msg = ~A~%" move-or-stop-or-timeout)
+                     (game-logger-add-scores (stop-scores m))
                      (progn
                        (format t "Game stop.~%")
                        (when (typep (state player) 'game-with-scores)

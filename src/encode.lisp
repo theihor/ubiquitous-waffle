@@ -117,3 +117,9 @@
     (let ((prefix (if (keywordp obj) ":" "#")))
       (yason:encode (format nil "~A~A" prefix obj) stream))))
 
+
+(defmethod yason:encode ((obj score-info) &optional stream)
+  (yason:with-output (stream)
+    (yason:with-object ()
+      (yason:encode-object-element "punter" (score-info-punter obj))
+      (yason:encode-object-element "scores" (score-info-score obj)))))
