@@ -136,6 +136,9 @@
 		       (m (parse move-or-stop-or-timeout)))
 		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
+                    ((numberp m)
+                     ;;(debug-log "Failed with timeout ~A~%" m)
+                     t)
 		    ((typep m 'stop)
                      (format t "stop msg = ~A~%" move-or-stop-or-timeout)
                      (game-logger-add-scores (stop-scores m))
@@ -186,7 +189,7 @@
 
   (let ((stdin *standard-input*)
         ;; (stdout *standard-output*)
-        (player (make-player 'connector-player))
+        (player (make-player 'connector-player :gambling t :tricky t))
         (*package* (find-package :src/main)))
     
     (debug-log "Sending me...~%")
@@ -199,7 +202,10 @@
       ;; (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
         (debug-log "m: ~A~%" m)
-        (cond 
+        (cond
+          ((numberp m)
+           (debug-log "Failed with timeout ~A~%" m)
+           t)
           ((typep m 'setup)
            (debug-log "Init new player.~%")
            (init-player player m)
@@ -234,11 +240,14 @@
     )
   )
 
-(defun run-players-on-port (players port)
+(defun run-players-on-port (port &rest players)
   "Runs players from the PLAYERS list on game with port PORT"
   (dolist (player players)
     (sb-thread:make-thread
-     (lambda () (main-online port player)))))
+     (lambda ()
+       (if (listp player)
+           (apply #'main-online port player)
+           (main-online port player))))))
 
 (defclass bot ()
   ((id :accessor id
