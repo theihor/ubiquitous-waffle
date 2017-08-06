@@ -232,3 +232,13 @@ function show_player() {
     }
     history_goto_aux(document.timestamp);
 }
+
+function history_player_forward() {
+    for (var i = 0; i < document.players_number; ++i)
+        history_forward();
+}
+
+function history_player_backward() {
+    for (var i = 0; i < document.players_number; ++i)
+        history_backward();
+}
