@@ -81,7 +81,11 @@
   (make-instance 'claim
                  :source src
                  :target trgt
-                 :punter (id state)))
+                 :punter (id state))
+  ;; (make-instance 'splurge
+  ;;                :punter (id state)
+  ;;                :route (list src trgt))
+  )
 
 (defun make-pass (state)
   (make-instance 'pass :punter (id state)))
