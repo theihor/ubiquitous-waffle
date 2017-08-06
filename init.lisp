@@ -13,7 +13,7 @@
 ;; (ql:quickload 'cl-heap)
 ;; (ql:quickload 'spatial-trees)
 ;; (ql:quickload 'spatial-trees.nns)
-;; (ql:quickload 'apply-argv)
+(ql:quickload 'apply-argv)
 ;; (ql:quickload 'ironclad)
 ;; (ql:quickload 'babel)
 ;; (ql:quickload 'cl-svg)

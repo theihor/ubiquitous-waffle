@@ -1,10 +1,11 @@
 (defpackage :src/main
   (:nicknames :main)
-  (:use :common-lisp :src/decode :src/encode 
+  (:use :common-lisp :anaphora :src/decode :src/encode
         :src/game-protocol
         :src/game-player
         :src/punter
         :src/game-state
+        :src/simulator
         :src/graph))
 
 (in-package :src/main)
@@ -106,7 +107,7 @@
   (apply #'format *standard-output* str params)
   (finish-output *standard-output*))
 
-(defparameter *do-logging* nil)
+(defparameter *do-logging* t)
 
 (defun debug-log (str &rest params)
   (when *do-logging*
@@ -142,8 +143,8 @@
                (debug-log "Computed score:~%")
                (loop :for punter :below (players-number (state player))
                   :do (debug-log "~A :~A~%"
-                              punter
-                              (score (elt (punters (state player)) punter)))))))
+                                 punter
+                                 (score (elt (punters (state player)) punter)))))))
           ((typep (car m) 'move)
            (debug-log "Getting new moves...~%")
            (when state
@@ -162,34 +163,58 @@
     )
   )
 
-;; (defun main ()
-;;   (when sb-ext:*posix-argv*
-;;     (let* ((parsed-args (apply-argv:parse-argv* ;;'("./test" "-f" "problems/problem_1.json")))
-;; 			 sb-ext:*posix-argv*))
-;; 	   (files) (phrases) (time) (memory) (proc-count))
-;;       ;;(format t "~A~%~A~%" parsed-args (alexandria:plist-alist (cdr parsed-args)))
-;;       (mapcar (lambda (p) 
-;; 		(let ((o (string (car p)))
-;; 		      (v (cdr p)))
-;; 		  (cond
-;; 		    ((string= "-f" o) (push v files))
-;; 		    ((string= "-p" o) (push v phrases))
-;; 		    ((string= "-c" o) (setq proc-count v))
-;; 		    ((string= "-m" o) (setq memory v))
-;; 		    ((string= "-t" o) (setq time (parse-integer v :junk-allowed t))))))
-;; 	      (alexandria:plist-alist (cdr parsed-args)))
-;;       (when time
-;;         (set-timeout time))
-;;       (setq *magic-words* phrases)
-;;       (setq *magic-words-cst* (make-command-seq-matching-tree phrases))
-;;       ;;(format t "~A~%" files)
-;;       (let ((result-list nil))
-;; 	(dolist (f (reverse files))			
-;; 	  (when (probe-file f)
-;; 	    ;;(format t "~A~%~%" (alexandria:read-file-into-string f))
-;;             (debug-log "Processing file ~A~%" f)
-;; 	    (setf result-list 
-;; 		  (append result-list (let ((*standard-output* *error-output*))
-;;                                         (simple-wave-from-task 
-;;                                          (decode-task (alexandria:read-file-into-string f)))))))) 
-;; 	(yason:encode result-list)))))
+(defun main-simulator ()
+  (when sb-ext:*posix-argv*
+    (let* ((output *standard-output*)
+           (input *standard-input*)
+           (botlist (cdr (apply-argv:parse-argv* sb-ext:*posix-argv*)))
+           (botloop (copy-list botlist))
+           (game-map (parse-map (get-random-map-json)))
+           (rivers (length (map-rivers game-map)))
+
+           (player-table (make-hash-table :test #'equal))
+           (scores-table (make-hash-table :test #'equal))
+
+           (moves)
+           (steps 0))
+      (setf (cdr (last botloop)) botloop)
+      (loop :for bot :in botloop
+         ;; :for steps := 0 :then (1+ steps)
+         :while (< steps rivers) :do
+         (progn
+           ;; run bot with in/out piping
+           (debug-log "Running bot ~a~%" bot)
+           (sb-ext:run-program bot nil :output input :input output)
+           ;; perfom handshake
+           (debug-log "Reading message~%")
+           (let ((id (parse-me (read-with-size input))))
+             (debug-log "Shook hands with ~a~%" id)
+             (format-std "~A" (encode-you id))
+             ;; setup or continue
+             (if (gethash id player-table)
+                 (progn
+                   ;; send current moves and state
+                   (format-std (encode-moves moves (gethash id player-table)))
+                   ;; get next move
+                   (multiple-value-bind (move state)
+                       (parse-move-with-state (read-with-size input))
+                     (setf (gethash id player-table) state)
+                     (push move moves))
+                   (incf steps))
+                 (progn
+                   (debug-log "Performing setup...~%")
+                   (format-std
+                    (encode-setup (make-setup id (length botlist) game-map)))
+                   (setf (gethash player-table id)
+                         (parse-ready (read-with-size input)))))))
+         :finally
+         (dolist (bot botlist)
+           ;; open in/out pipes
+           (sb-ext:run-program bot nil :output input :input output)
+           ;; perform handshake
+           (let ((id (parse-me (read-with-size input))))
+             (debug-log "Getting ID... ~a~%" id)
+             (format-std "~A" (encode-you id)))
+           ;; send stop message
+           (debug-log "Sending stop to ~a...~%" bot)
+           (format-std (encode-stop moves scores-table)))))))
