@@ -9,7 +9,6 @@
    #:init-player
    #:update-player
    #:select-move
-   #:bid-on-futures
    #:game-player
    #:cowboy-player
    #:connector-player
@@ -22,7 +21,9 @@
    #:avail-graph
    #:current-network
    #:mines
-   #:claimed-mines))
+   #:claimed-mines
+   #:player-futures
+   #:futures))
 
 (declaim (optimize (debug 0) (safety 0) (speed 3)))
 
@@ -31,20 +32,18 @@
 (defclass game-player ()
   ((state :accessor state
           :initarg :state
-          :initform nil)))
+          :initform nil)
+   (futures :initarg :futures 
+	    :accessor player-futures)))
 
 (defgeneric make-player (player-class &rest params))
 (defgeneric init-player (player setup-message))
 (defgeneric update-player (player moves))
 (defgeneric select-move (player))
-(defgeneric bid-on-futures (player setup-message))
-
-(defmethod bid-on-futures (player setup-message)
-  (declare (ignore player setup-message))
-  nil)
 
 (defmethod init-player ((player game-player) setup-message)
-  (setf (state player) (make-game-state setup-message)))
+  (setf (state player) (make-game-state setup-message))
+  (setf (player-futures player) nil))
 
 (defmethod update-player ((player game-player) moves)
   (process-moves (state player) moves))

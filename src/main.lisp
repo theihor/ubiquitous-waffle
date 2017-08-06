@@ -54,12 +54,15 @@
   ((game-log-map :accessor game-log-map
                    :initform nil)
    (game-log-rev-moves :accessor game-log-rev-moves
+                       :initform nil)
+   (game-log-futures :accessor game-log-futures
                        :initform nil)))
 
 (defvar *game-log*)
 
-(defun game-logger-setup (s)
-  (setf (game-log-map *game-log*) (gethash "map" s)))
+(defun game-logger-setup (s futures)
+  (setf (game-log-map *game-log*) (gethash "map" s))
+  (setf (game-log-futures *game-log*) futures))
 
 (defun game-logger-add-move (move)
   (push move (game-log-rev-moves *game-log*)))
@@ -70,7 +73,11 @@
       (yason:with-output (stream)
         (yason:with-object ()
           (yason:encode-object-element "map" (game-log-map *game-log*))
-          (yason:encode-object-element "moves" (reverse (game-log-rev-moves *game-log*))))))))
+          (yason:encode-object-element "moves" (reverse (game-log-rev-moves *game-log*)))
+	  (when (game-log-futures *game-log*)
+	    (yason:encode-object-element "futures" (game-log-futures *game-log*))))))))
+
+(defparameter *verbose* t)
 
 ;;run example (main-online 9066 'cowboy-player)
 (defun main-online (port &rest player-params)
@@ -93,21 +100,24 @@
 	   (multiple-value-setq (s the-state setup-ht) (parse s))
 	   (when (and s (typep s 'setup))
 	     (format t "Getting setup... Punter:~A~%" (setup-punter s))
-             (game-logger-setup setup-ht)
 	     (init-player player s)
 
 	     ;; send ready
-	     (format t "Sending ready...~%")
-	     (tcp-send
-              socket
-              (encode-ready (setup-punter s)
-                            :futures (bid-on-futures player s)))
+             (format t "Sending ready...~%")
+             (when *verbose*
+	       (format t "Bid on futures:")
+	       (mapcar #'yason:encode (player-futures player))
+	       (format t "~%"))
+	     (tcp-send socket
+		       (encode-ready (setup-punter s)
+				     :futures (player-futures player)))
+	     (game-logger-setup setup-ht (player-futures player))
 	     ;; loop for moves until stop
 	     (loop
 		;; get move
 		(let* ((move-or-stop-or-timeout (tcp-read socket))
 		       (m (parse move-or-stop-or-timeout)))
-		  (format t "~A~%" move-or-stop-or-timeout)
+		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
 		    ((typep m 'stop)
                      (progn

@@ -135,8 +135,7 @@
           (push first-mine claimed-mines)))
       (%do-move))))
 
-(defclass future-player (connector-player-old)
-  ((futures :initarg :futures :accessor player-futures)))
+(defclass future-player (connector-player-old) ())
 
 (defmethod make-player ((player-class (eql 'future-player)) &rest params)
   (declare (ignore params))
@@ -197,7 +196,3 @@ Returns list of (mine . target)"
                               (make-claim state src trgt)))))
                      (call-next-method)))))
       (%do-move))))
-
-(defmethod bid-on-futures ((player future-player) setup-message)
-  (declare (ignore setup-message))
-  (player-futures player))
