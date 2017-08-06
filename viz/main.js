@@ -71,8 +71,10 @@ function show_history_file() {
 
 function history_forward() {
     if (document.timestamp < document.moves.length) {
-        var claim = document.moves[document.timestamp]["claim"];
-        if (claim) {
+        var move = document.moves[document.timestamp];
+        update_move_info(move);
+        if ("claim" in move) {
+            var claim = move.claim;
             var cy = document.cy;
             cy.edges("#" + make_edge_id(claim.source, claim.target))
                 .forEach(function(edge) {
@@ -80,23 +82,29 @@ function history_forward() {
                 });
         }
         document.timestamp++;
+    } else {
+        update_move_info(null);
     }
+    update_time_info();
 }
 
 function history_backward() {
-    console.log("ts = " + document.timestamp);
-    console.log("len = " + document.moves.length);
     if (document.timestamp <= document.moves.length && document.timestamp > 0) {
         document.timestamp--;
-        var claim = document.moves[document.timestamp]["claim"];
-        if (claim) {
+        var move = document.moves[document.timestamp];
+        update_move_info(move);
+        if ("claim" in move) {
+            var claim = move.claim;
             var cy = document.cy;
             cy.edges("#" + make_edge_id(claim.source, claim.target))
                 .forEach(function(edge) {
                     edge.style("line-color", "lightgray");
                 });
-            }
+        }
+    } else {
+        update_move_info(null);
     }
+    update_time_info();
 }
 
 function make_edge_id(from, to) {
@@ -123,7 +131,6 @@ function bounding_box(sites) {
                 r.min_y = site.y;
             if (r.max_y < site.y)
                 r.max_y = site.y;
-            console.log("min x: " + r.min_x + " max x: " + r.max_x);
         } else {
             r.min_x = site.x;
             r.max_x = site.x;
@@ -133,4 +140,20 @@ function bounding_box(sites) {
     });
 
     return r;
+}
+
+function update_time_info() {
+    var div = document.getElementById("time_info");
+    div.innerHTML = "time: " + document.timestamp + " / " + document.moves.length;
+}
+
+function update_move_info(move) {
+    var div = document.getElementById("move_info");
+    
+    if (move == null) {
+        div.innerHTML = "no move"
+        return;
+    }
+
+    div.innerHTML = JSON.stringify(move);
 }
