@@ -46,7 +46,9 @@ function show_history_file() {
         var cy = cytoscape({
             container: document.getElementById("cy"),
             style: 
-"node { background-color: DarkGray; width: " + node_size + "; height: " + node_size + "; }" +
+            "node { background-color: DarkGray; width: " + node_size + "; height: " + node_size + ";" +
+                "z-index: 10;" +
+                " }" +
 "edge { width: " + line_width + "; line-color: lightgray; }"
         });
         document.cy = cy;
@@ -180,12 +182,20 @@ function mark_edge(edge, style) {
 }
 
 function mark_free(claim) {
-    mark_edge(claim, { "line-color": "lightgray" })
+    mark_edge(claim, { "line-color": "lightgray",
+                       "z-index": 10
+                     })
 }
 
 function mark_taken(claim) {
     var palette = document.palette;
-    mark_edge(claim, { "line-color": palette[claim.punter] })
+    var focus_player = parseInt(document.getElementById("player_selector").value);
+    var z_index = 20;
+    if (focus_player == claim.punter)
+        z_index = 30;
+    mark_edge(claim, { "line-color": palette[claim.punter],
+                       "z-index": z_index
+                     })
 }
 
 function history_reset() {
