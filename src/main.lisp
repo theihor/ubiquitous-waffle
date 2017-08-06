@@ -40,7 +40,9 @@
   (case state
     (0 (let ((c (read-char stream)))
 	 (if (char= c #\:)
-	     (read-with-size stream (parse-integer size) 1)
+	     (progn
+           (debug-log "size = ~A~%" size)
+           (read-with-size stream (parse-integer size) 1))
 	     (read-with-size stream (concatenate 'string size (string c)) 0))))
     (1 (let* ((str (make-string size)))
 	 (read-sequence str stream)
@@ -192,7 +194,8 @@
                   :do (debug-log "~A :~A~%"
                               punter
                               (score (elt (punters (state player)) punter)))))))
-          ((typep (car m) 'move)
+          ((or (null m)
+               (typep (car m) 'move))
            (debug-log "Getting new moves...~%")
            (when state
              (setf player state)
@@ -210,66 +213,100 @@
     )
   )
 
+(defclass bot ()
+  ((id :accessor id
+       :initform nil)
+   (name :accessor name)
+   (process :accessor process
+            :initform nil)
+   (setupped :accessor setupped)
+   (program-name :accessor program-name
+                 :initarg :program-name)))
+
+(defun restart-bot (bot)
+  (awhen (process bot)
+         (sb-ext:process-kill it 9))
+  (setf (process bot)
+        (sb-ext:run-program
+         (program-name bot) nil :output :stream :input :stream
+         :error *error-output* :wait nil)))
+
+(defun read-from-bot (bot)
+  (read-with-size (sb-ext:process-output (process bot))))
+
+(defun write-to-bot (bot str &rest args)
+  (let ((*standard-output* (sb-ext:process-input (process bot))))
+    (apply #'format-std str args)))
+
+(defun main-simulator-aux (botlist)
+  (let* ((*logger-name* "simulator")
+         (botloop (mapcar (lambda (name)
+                            (make-instance 'bot :program-name name))
+                          botlist))
+         (game-map (parse-map (get-random-map-json)))
+         (rivers (length (map-rivers game-map)))
+
+         (player-table (make-hash-table :test #'equal)) 
+         (scores-table (make-hash-table :test #'equal))
+
+         (moves)
+         (steps 0)
+         (new-id 0)) 
+    
+    (setf (cdr (last botloop)) botloop)
+
+    (loop :for bot :in botloop
+       ;; :for steps := 0 :then (1+ steps)
+       :while (< steps rivers) :do
+       (let* ()
+         (restart-bot bot)
+         (unless (id bot)
+           (setf (id bot) (incf new-id)))
+         
+         ;; run bot with in/out piping
+         (debug-log "Running bot ~A: ~a~%" (id bot) (program-name bot))
+         
+         ;; perfom handshake
+         (debug-log "Reading message~%")
+         (let ((name (parse-me (read-from-bot bot)))
+               (id (id bot)))
+           (setf (name bot) name)
+           (debug-log "Shook hands with ~a~%" name)
+           (write-to-bot bot "~A" (encode-you id))
+           ;; setup or continue
+           (if (gethash id player-table)
+               (progn
+                 (handler-case
+                     (progn
+                       ;; send current moves and state
+                       (write-to-bot bot (let* ((*yason-lisp-readable-encode* nil))
+                                           (encode-moves moves (gethash id player-table))))
+                       ;; get next move
+                       (multiple-value-bind (move state)
+                           (parse-move-with-state (read-from-bot bot))
+                         (setf (gethash id player-table) state)
+                         (push move moves)))
+                   (error (e) (debug-log "ERROR: ~A~%" e)))
+                 (incf steps))
+               (progn
+                 (debug-log "Performing setup...~%")
+                 (write-to-bot bot
+                               (encode-setup (make-setup id (length botlist) game-map)))
+                 ;; (debug-log "Sent: ~A~%" (encode-setup (make-setup id (length botlist) game-map)))
+                 (setf (gethash id player-table)
+                       (parse-ready (read-from-bot bot)))
+                 (setf (setupped bot) t)))))
+       :finally
+       (dolist (bot botlist)
+         ;; perform handshake
+         (let ((name (parse-me (read-from-bot bot)))
+               (id (id bot)))
+           (debug-log "Getting ID... ~a ~A~%" name id)
+           (write-to-bot bot "~A" (encode-you id))
+           ;; send stop message
+           (debug-log "Sending stop to ~a...~%" id))
+         (write-to-bot bot (encode-stop moves scores-table))))))
+
 (defun main-simulator ()
   (when sb-ext:*posix-argv*
-    (let* ((*logger-name* "simulator")
-           ;; (output *standard-output*)
-           ;; (input *standard-input*)
-           (botlist (cdr (apply-argv:parse-argv* sb-ext:*posix-argv*)))
-           (botloop (copy-list botlist))
-           (game-map (parse-map (get-random-map-json)))
-           (rivers (length (map-rivers game-map)))
-
-           (player-table (make-hash-table :test #'equal))
-           (scores-table (make-hash-table :test #'equal))
-
-           (moves)
-           (steps 0))
-      (setf (cdr (last botloop)) botloop)
-      (loop :for bot :in botloop
-         ;; :for steps := 0 :then (1+ steps)
-         :while (< steps rivers) :do
-         (let* ((bot-process (sb-ext:run-program
-                              bot nil :output :stream :input :stream
-                              :error *error-output* :wait nil))
-                (input (sb-ext:process-output bot-process))
-                (*standard-output* (sb-ext:process-input bot-process)))
-           ;; run bot with in/out piping
-           (debug-log "Running bot ~a~%" bot)
-           
-           ;; perfom handshake
-           (debug-log "Reading message~%")
-           (let ((id (parse-me (read-with-size input))))
-             (debug-log "Shook hands with ~a~%" id)
-             (format-std "~A" (encode-you id))
-             ;; setup or continue
-             (if (gethash id player-table)
-                 (progn
-                   ;; send current moves and state
-                   (format-std (encode-moves moves (gethash id player-table)))
-                   ;; get next move
-                   (multiple-value-bind (move state)
-                       (parse-move-with-state (read-with-size input))
-                     (setf (gethash id player-table) state)
-                     (push move moves))
-                   (incf steps))
-                 (progn
-                   (debug-log "Performing setup...~%")
-                   (format-std
-                    (encode-setup (make-setup id (length botlist) game-map)))
-                   (setf (gethash player-table id)
-                         (parse-ready (read-with-size input)))))))
-         :finally
-         (dolist (bot botlist)
-           (let* ((bot-process (sb-ext:run-program
-                                bot nil :output :stream :input :stream
-                                :error *error-output* :wait nil))
-                  (input (sb-ext:process-output bot-process))
-                  (*standard-output* (sb-ext:process-input bot-process)))
-             ;; perform handshake
-             (let ((id (parse-me (read-with-size input))))
-               (debug-log "Getting ID... ~a~%" id)
-               (format-std "~A" (encode-you id))))
-           ;; send stop message
-           (debug-log "Sending stop to ~a...~%" bot)
-           (format-std (encode-stop moves scores-table)))))))
+    (main-simulator-aux (cdr (apply-argv:parse-argv* sb-ext:*posix-argv*)))))

@@ -24,7 +24,8 @@
    #:claimed-mines
    #:player-futures
    #:futures
-   #:find-regions-connecting-move))
+   #:find-regions-connecting-move
+   #:location))
 
 (declaim (optimize (debug 0) (safety 0) (speed 3)))
 
