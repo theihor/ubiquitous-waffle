@@ -1,8 +1,12 @@
 (uiop:define-package :src/encode
     (:use :common-lisp :anaphora :src/game-protocol)
   (:export #:encode-me
+           #:encode-you
+           #:encode-setup
            #:encode-ready
-           #:encode-move))
+           #:encode-move
+           #:encode-moves
+           #:encode-stop))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -37,13 +41,24 @@
 (defun encode-msg (json-msg)
   (format nil "~a:~a" (length json-msg) json-msg))
 
-
 (defun encode-me (name)
   (encode-msg
    (with-output-to-string (stream)
      (yason:with-output (stream)
        (yason:with-object ()
          (yason:encode-object-element "me" name))))))
+
+(defun encode-you (name)
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "you" name))))))
+
+(defun encode-setup (setup)
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:encode setup stream))))
 
 (defun encode-ready (punter-id &key futures state)
   (encode-msg
@@ -60,6 +75,22 @@
   (encode-msg
    (with-output-to-string (stream)
      (yason:encode move stream))))
+
+(defun encode-moves (moves state)
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "move" moves)
+         (yason:encode-object-element "state" state))))))
+
+(defun encode-stop (moves scores)
+  (encode-msg
+   (with-output-to-string (stream)
+     (yason:with-output (stream)
+       (yason:with-object ()
+         (yason:encode-object-element "moves" moves)
+         (yason:encode-object-element "scores" scores))))))
 
 ;;;
 ;;; universal encoder
