@@ -151,7 +151,10 @@
    (starting-locations :accessor starting-locations
                        :initform nil)
    (not-reached-locations :accessor not-reached-locations
-                          :initform nil)))
+                          :initform nil)
+   (gambling :accessor gambling
+            :initform nil
+            :initarg :gambling)))
 
 (defun find-connecting-move (graph current-network target)
   (if (gethash target current-network)
@@ -250,7 +253,23 @@
      :when val
      :summing (* val val)))
 
-(defun build-full-network (graph distance-tab start-mine mines num-moves)
+(defun node-with-max-distance (mine distance-tab node->moves moves-cap)
+  (let ((result-node nil)
+        (max-dist 0))
+    (maphash (lambda (node move-num)
+               (when (< move-num moves-cap)
+                 (let ((dist (gethash (cons mine node) distance-tab))
+                       (rev-dist (gethash (cons node mine) distance-tab)))
+                   ;; Do not bid on mines
+                   (when (and (null rev-dist)
+                              (> dist max-dist))
+                     (setf max-dist dist)
+                     (setf result-node node)))))
+             node->moves)
+    (values result-node max-dist)))
+
+(defun build-full-network (graph distance-tab start-mine mines num-moves
+                           &key gamble)
   (let ((current-network (make-hash-table :test #'equal))
         (move-num-tab (make-hash-table :test #'equal))
         (mine-tab (make-hash-table :test #'equal))
@@ -260,7 +279,7 @@
        :do (setf (gethash mine mine-tab) t))
     ;; (push start-mine claimed-mines)
     ;; (push start-mine target-order)
-    ;; (setf (gethash start-mine current-network) t)
+    (setf (gethash start-mine current-network) t)
     (setf (gethash start-mine move-num-tab) 0)
     (labels ((%add-target (target)
                (setf (gethash target current-network) t)
@@ -291,6 +310,7 @@
              (%iter-non-targeted (move-num)
                (when (< move-num num-moves)
                  (let ((move (find-best-non-targeted-move graph current-network distance-tab claimed-mines)))
+                   ;; (format t "Best non-targeted ~A~%" move)
                    (when move
                      (%add-intermediate (cdr move) move-num)
                      (%iter-non-targeted (1+ move-num))))))
@@ -300,46 +320,84 @@
                             (declare (ignore val))
                             (incf score (estimate-node-score node claimed-mines distance-tab)))
                           current-network)
-                 score)))
+                 ;; (format t "Network : ~A~%" (alexandria:hash-table-keys current-network))
+                 ;; (format t "Computed score for order ~A, claimed ~A, score: ~A~%"
+                 ;;         (reverse target-order) claimed-mines score)
+                score))
+             (%moves-cap ()
+               (floor (* 0.5 num-moves)))
+             (%gamble ()
+               (let ((futures nil))
+                 (loop :for mine :in claimed-mines
+                    :do (multiple-value-bind (node dist)
+                            (node-with-max-distance mine distance-tab
+                                                    move-num-tab (%moves-cap))
+                          (when node
+                            (push (list mine node (* dist dist dist))
+                                  futures))))
+                 ;; (format t "Futures : ~A~%" futures)
+                 futures))
+             (%sort-by-num-move (targets)
+               (stable-sort (copy-list targets)
+                            #'<
+                            :key (lambda (node)
+                                   (or (gethash node move-num-tab)
+                                       1000000)))))
       (%iter 0)
-      (values (append
-               (reverse target-order)
-               ;; Add other mines
-               (alexandria:hash-table-keys mine-tab))
-              (%network-score)))))
+      (let ((mines-order (append
+                          (reverse target-order)
+                          ;; Add other mines
+                          (alexandria:hash-table-keys mine-tab)))
+            (score (%network-score)))
+        (if gamble
+            (let ((futures (%gamble)))
+              (values (%sort-by-num-move (append mines-order
+                                                 (remove-duplicates (mapcar #'second futures) :test #'equal)))
+                      (+ score (reduce #'+ (mapcar #'third futures)))
+                      futures))
+            (values mines-order score))))))
 
-(defun find-best-mines-order (graph distance-tab mines num-moves)
+(defun find-best-mines-order (graph distance-tab mines num-moves &key gamble)
   (let ((max-score 0)
-        (best-order nil))
+        (best-order nil)
+        (best-futures nil))
     (loop :for mine :in mines
-       :do (multiple-value-bind (order score)
-               (build-full-network graph distance-tab mine mines num-moves)
+       :do (multiple-value-bind (order score futures)
+               (build-full-network graph distance-tab mine mines num-moves
+                                   :gamble gamble)
              (when (> score max-score)
                (setf max-score score)
-               (setf best-order order))))
-    (or best-order
-        mines)))
+               (setf best-order order)
+               (setf best-futures futures))))
+    ;; (format t "Best order : ~A~%" best-order)
+    (values (or best-order
+                mines)
+            best-futures)))
 
 (defun find-best-non-targeted-move (graph current-network distance-tab claimed-mines)
   (let ((max-move nil)
         (max-dist 0))
     (maphash (lambda (node val)
                (declare (ignore val))
-               (let ((neighbour (any-neighbour graph node)))
-                 (when (and neighbour
-                            (null (gethash neighbour current-network)))
-                   (let ((dist (estimate-node-score neighbour claimed-mines distance-tab)))
-                     (when (> dist max-dist)
-                       (setf max-move (cons node neighbour)))))))
+               (mapc-node-edges
+                graph node
+                (lambda (neighbour data)
+                  (declare (ignore data))
+                  (when (and neighbour
+                             (null (gethash neighbour current-network)))
+                    (let ((dist (estimate-node-score neighbour claimed-mines distance-tab)))
+                      (when (> dist max-dist)
+                        (setf max-move (cons node neighbour))))))))
              current-network)
     max-move))
 
-(defmethod make-player ((player-class (eql 'connector-player)) &rest params)
+(defmethod make-player ((player-class (eql 'connector-player)) &rest params &key gambling)
   (declare (ignore params))
-  (make-instance 'connector-player))
+  (make-instance 'connector-player
+                 :gambling gambling))
 
 (defmethod init-player :after ((player connector-player) setup-message)
-  (with-slots (avail-graph state current-network) player
+  (with-slots (avail-graph state current-network gambling futures) player
     (setf avail-graph (clone-graph (game-map state)))
     (setf current-network (make-hash-table :test #'equal))
     (let* ((mines (mines state))
@@ -356,14 +414,23 @@
            ;;                 (sort (copy-list mine-scores)
            ;;                       #'<
            ;;                       :key #'cdr)))
-           (sorted (find-best-mines-order avail-graph (distance-tab state)
-                                          mines (floor (length (map-rivers (setup-map setup-message)))
-                                                       (players-number state)))))
-      (setf (mines player) sorted)
-      (setf (starting-locations player)
-            (mapcar (lambda (node)
-                      (make-location :mine node))
-                    sorted)))))
+           )
+      (multiple-value-bind (sorted cool-futures)
+          (find-best-mines-order avail-graph (distance-tab state)
+                                 mines (floor (length (map-rivers (setup-map setup-message)))
+                                              (players-number state))
+                                 :gamble gambling)
+        (setf (mines player) sorted)
+        (when cool-futures
+          (setf futures
+                (loop :for (mine node _) :in cool-futures
+                   :collect (make-instance 'future
+                                           :source mine
+                                           :target node))))
+        (setf (starting-locations player)
+              (mapcar (lambda (node)
+                        (make-location :mine node))
+                      sorted))))))
 
 (defmethod update-player :after ((player connector-player) moves)
   (with-slots (current-network avail-graph state) player
