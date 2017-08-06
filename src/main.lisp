@@ -135,6 +135,9 @@
 		       (m (parse move-or-stop-or-timeout)))
 		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
+                    ((numberp m)
+                     ;;(debug-log "Failed with timeout ~A~%" m)
+                     t)
 		    ((typep m 'stop)
                      (format t "stop msg = ~A~%" move-or-stop-or-timeout)
                      (game-logger-add-scores (stop-scores m))
