@@ -9,6 +9,7 @@
    #:init-player
    #:update-player
    #:select-move
+   #:get-player-name
    #:game-player
    #:cowboy-player
    #:connector-player
@@ -36,12 +37,23 @@
           :initarg :state
           :initform nil)
    (futures :initarg :futures 
-            :accessor player-futures)))
+            :accessor player-futures)
+   (verbose :initarg :verbose
+            :accessor verbose
+            :initform nil)))
+
+(defmacro player-log (player str &rest params)
+  `(when (verbose ,player)
+     (format *error-output* ,str ,@params)))
 
 (defgeneric make-player (player-class &rest params))
 (defgeneric init-player (player setup-message))
 (defgeneric update-player (player moves))
 (defgeneric select-move (player))
+(defgeneric get-player-name (player))
+
+(defmethod get-player-name (player)
+  (symbol-name (class-name (class-of player))))
 
 (defmethod init-player ((player game-player) setup-message)
   (setf (state player) (make-game-state setup-message))
@@ -125,15 +137,15 @@
          :accessor kind)
    (node :initarg :node
          :accessor node)
-   (data :initarg :data
-         :accessor data
-         :initform nil)))
+   (cluster :initarg :cluster
+            :accessor cluster
+            :initform nil)))
 
-(defun make-location (kind node &optional data)
-  (make-instance 'location
-                 :kind kind
-                 :node node
-                 :data data))
+(defun make-location (kind node &rest params)
+  (apply #'make-instance 'location
+         :kind kind
+         :node node
+         params))
 
 (defun mine-location? (location)
   (eq (kind location) :mine))
@@ -155,8 +167,11 @@
    (not-reached-locations :accessor not-reached-locations
                           :initform nil)
    (gambling :accessor gambling
-            :initform nil
-            :initarg :gambling)))
+             :initform nil
+             :initarg :gambling)
+   (tricky :accessor tricky
+           :initform nil
+           :initarg :tricky)))
 
 (defun find-connecting-move (graph current-network target)
   (if (gethash target current-network)
@@ -207,9 +222,20 @@
                (mapc-node-edges graph node
                                 (lambda (neighbour data)
                                   (declare (ignore data))
-                                  (setf (gethash neighbour adj) t))))
+                                  (unless (gethash neighbour cluster)
+                                    (setf (gethash neighbour adj) t)))))
              cluster)
     (hash-table-count adj)))
+
+(defun extend-cluster (graph cluster)
+  (maphash (lambda (node val)
+             (declare (ignore val))
+             (mapc-node-edges graph node
+                              (lambda (neighbour data)
+                                (declare (ignore data))
+                                (unless (gethash neighbour cluster)
+                                  (return-from extend-cluster (values node neighbour))))))
+           cluster))
 
 (defun singleton-hash-table (value)
   (let ((tab (make-hash-table :test #'equal)))
@@ -240,7 +266,7 @@
                    (%move-from (node acc)
                      (let ((node1 (gethash node prev)))
                        (if (eq node1 t)
-                           acc
+                           (cons node acc)
                            (%move-from node1 (cons node acc))))))
             (multiple-value-bind (path-found target)
                 (%bfs nodes)
@@ -393,13 +419,11 @@
              current-network)
     max-move))
 
-(defmethod make-player ((player-class (eql 'connector-player)) &rest params &key gambling)
-  (declare (ignore params))
-  (make-instance 'connector-player
-                 :gambling gambling))
+(defmethod make-player ((player-class (eql 'connector-player)) &rest params)
+  (apply #'make-instance 'connector-player params))
 
 (defmethod init-player :after ((player connector-player) setup-message)
-  (with-slots (avail-graph state current-network gambling futures) player
+  (with-slots (avail-graph state current-network gambling tricky futures) player
     (setf avail-graph (clone-graph (game-map state)))
     (setf current-network (make-hash-table :test #'equal))
     (let* ((mines (mines state))
@@ -431,18 +455,30 @@
                                            :target node))))
         (setf (starting-locations player)
               (mapcar (lambda (node)
-                        (make-location :mine node))
+                        (if tricky
+                            (make-location :mine node :cluster (singleton-hash-table node))
+                            (make-location :mine node)))
                       sorted))))))
 
 (defmethod update-player :after ((player connector-player) moves)
-  (with-slots (current-network avail-graph state) player
+  (with-slots (current-network avail-graph state locations tricky) player
     (mapc-claims
      moves
      (lambda (id src trgt)
        (remove-edge avail-graph src trgt)
        (when (= id (id state))
-         (setf (gethash src current-network) t)
-         (setf (gethash trgt current-network) t))))))
+         (if (or (gethash src current-network)
+                 (gethash src current-network))
+             (progn
+               (setf (gethash src current-network) t)
+               (setf (gethash trgt current-network) t))
+             (when tricky
+               (loop :for location :in locations
+                  :do (when (and (cluster location)
+                                 (or (gethash src (cluster location))
+                                     (gethash trgt (cluster location))))
+                        (setf (gethash src (cluster location)) t)
+                        (setf (gethash trgt (cluster location)) t))))))))))
 
 (defun extract-first (list predicate &optional acc)
   (if (null list)
@@ -454,12 +490,32 @@
 (defmethod select-move ((player connector-player))
   (with-slots (avail-graph current-network locations
                            starting-locations state claimed-mines
-                           not-reached-locations)
+                           not-reached-locations
+                           tricky)
       player
     (labels ((%claim (location)
                (when (mine-location? location)
                  (push (node location) claimed-mines)))
              (%do-move ()
+               (if tricky
+                   (%tricky-check-locations)
+                   (%do-move-non-tricky)))
+             (%tricky-check-locations ()
+               (let ((network-freedom (cluster-freedom avail-graph current-network)))
+                 (loop :for location :in locations
+                    :do (unless (hash-tables-intersect? current-network (cluster location))
+                          (let ((freedom (cluster-freedom avail-graph (cluster location))))
+                            (when (and freedom
+                                       (> freedom 0)
+                                       (< freedom 3)
+                                       (< (+ freedom 2) network-freedom))
+                              (multiple-value-bind (src trgt)
+                                  (extend-cluster avail-graph (cluster location))
+                                (player-log player "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
+                                            (node location) freedom src trgt)
+                                (return-from %tricky-check-locations (make-claim state src trgt))))))))
+               (%do-move-tricky))
+             (%do-move-non-tricky ()
                (if locations
                    (let ((next-location (car locations)))
                      (multiple-value-bind (src trgt)
@@ -470,12 +526,30 @@
                                 (if (eq src t)
                                     (%claim claimed-location)
                                     (push claimed-location not-reached-locations)))
-                              (%do-move))
+                              (%do-move-non-tricky))
                              (t (make-claim state src trgt)))))
+                   (%do-random-move)))
+             (%do-move-tricky ()
+               (if locations
+                   (let ((next-location (car locations)))
+                     (let ((path
+                            (find-regions-connecting-move avail-graph current-network (cluster next-location))))
+                       (player-log player "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
+                                   (alexandria:hash-table-keys (cluster next-location))
+                                   path)
+                       (cond ((or (null path)
+                                  (null (cdr path)))
+                              (let ((claimed-location (pop locations)))
+                                (if (null (cdr path))
+                                    (%claim claimed-location)
+                                    (push claimed-location not-reached-locations)))
+                              (%do-move-tricky))
+                             (t (make-claim state (first path) (second path))))))
                    (%do-random-move)))
              (%do-random-move ()
                (let ((max-move (find-best-non-targeted-move avail-graph current-network
                                                             (distance-tab state) claimed-mines)))
+                 (player-log player "Random move : ~A~%" max-move)
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
                      (%try-not-reached))))

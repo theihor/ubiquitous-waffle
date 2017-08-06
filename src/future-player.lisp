@@ -1,5 +1,6 @@
 (uiop:define-package :src/future-player
     (:use :common-lisp
+          :anaphora
           :src/game-protocol
           :src/graph
           :src/game-state
@@ -10,7 +11,7 @@
 
 (in-package :src/future-player)
 
-(declaim (optimize (debug 3) (safety 3) (speed 0)))
+(declaim (optimize (debug 0) (safety 0) (speed 3)))
 
 ;;; copy of connector player
 
@@ -141,30 +142,32 @@
   (declare (ignore params))
   (make-instance 'future-player))
 
-(defun sort-distances (distance-tab)
-  "Builds sorted alist of pairs (mine . target)"
-  (sort (alexandria:hash-table-alist distance-tab) #'> :key #'cdr))
-
-(defun find-futhest-futures (distance-tab moves)
-  "Finds furthest reachable sites. Reachable means there are enough moves to reach them in case other players do not obstruct.
-Returns list of (mine . target)"
-  (let ((target-list (sort-distances distance-tab))
-        (available-moves moves)
-        (result-targets))
-    (dolist (mine-target target-list (nreverse result-targets))
-      (destructuring-bind ((mine . target) . dist) mine-target
-        (if (< available-moves dist)
-            (return-from
-             find-futhest-futures (nreverse result-targets))
-            (progn (push
-                    (make-instance 'future :source mine :target target)
-                    result-targets)
-                   (decf available-moves dist)))))))
+(defun find-futhest-reachable-futures (distance-tab moves)
+  (let ((all-futures (make-array (list (hash-table-count distance-tab))))
+        (i 0))
+    (maphash
+     (lambda (key value)
+       (setf (aref all-futures i) (cons key value))
+       (incf i))
+     distance-tab)
+    (setf all-futures (sort all-futures #'> :key #'cdr))
+    (let ((mines (make-hash-table))
+          (result))
+      (loop :for ((mine . target) . dist) :across all-futures
+         :with available-moves = moves
+         :when (and (>= available-moves dist)
+                    (not (gethash mine mines)))
+         :do
+         (push
+          (make-instance 'future :source mine :target target) result)
+         (setf (gethash mine mines) t)
+         (decf available-moves dist))
+      (nreverse result))))
 
 (defun bid (player setup-map)
   ;; moves = number of rivers
   (let ((state (state player)))
-    (find-futhest-futures
+    (find-futhest-reachable-futures
      (distance-tab state)
      (truncate (/ (length (map-rivers setup-map))
                   (players-number state))))))

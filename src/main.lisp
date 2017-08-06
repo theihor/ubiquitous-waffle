@@ -59,7 +59,11 @@
    (game-log-rev-moves :accessor game-log-rev-moves
                        :initform nil)
    (game-log-futures :accessor game-log-futures
-                       :initform nil)))
+                     :initform nil)
+   (game-log-scores :accessor game-log-scores
+                    :initform nil)
+   (game-log-punter :accessor game-log-punter
+                    :initform nil)))
 
 (defvar *game-log*)
 
@@ -70,15 +74,25 @@
 (defun game-logger-add-move (move)
   (push move (game-log-rev-moves *game-log*)))
 
-(defun game-logger-print (file-name)
-  (let ((*yason-lisp-readable-encode* nil))
-    (with-open-file (stream file-name :direction :output :if-exists :supersede :if-does-not-exist :create)
+(defun game-logger-add-scores (scores)
+  (setf (game-log-scores *game-log*) scores))
+
+(defun game-logger-set-punter (punter)
+  (setf (game-log-punter *game-log*) punter))
+
+(defun game-logger-print (tag)
+  (let ((*yason-lisp-readable-encode* nil)
+        (path (make-pathname :directory (list :relative "log") :name tag :type "json")))
+    (ensure-directories-exist path)
+    (with-open-file (stream path :direction :output :if-exists :supersede :if-does-not-exist :create)
       (yason:with-output (stream)
         (yason:with-object ()
           (yason:encode-object-element "map" (game-log-map *game-log*))
           (yason:encode-object-element "moves" (reverse (game-log-rev-moves *game-log*)))
 	  (when (game-log-futures *game-log*)
-	    (yason:encode-object-element "futures" (game-log-futures *game-log*))))))))
+	    (yason:encode-object-element "futures" (game-log-futures *game-log*)))
+          (yason:encode-object-element "scores" (game-log-scores *game-log*))
+          (yason:encode-object-element "punter" (game-log-punter *game-log*)))))))
 
 (defparameter *verbose* t)
 
@@ -89,12 +103,13 @@
         (*game-log* (make-instance 'game-log))
 	(s)
         (setup-ht)
-        (the-state))
+        (the-state)
+        (team-name "SpiritRaccoons"))
     (unwind-protect
 	 (progn
 	   ;; send me
 	   (format t "Sending me...~%")
-	   (tcp-send socket (encode-me "SpiritRaccoons"))
+	   (tcp-send socket (encode-me team-name))
 	   ;; get you
 	   (format t "Getting you... ~A~%" (tcp-read socket))
 	   ;; get setup
@@ -103,6 +118,7 @@
 	   (multiple-value-setq (s the-state setup-ht) (parse s))
 	   (when (and s (typep s 'setup))
 	     (format t "Getting setup... Punter:~A~%" (setup-punter s))
+             (game-logger-set-punter (setup-punter s))
 	     (init-player player s)
 
 	     ;; send ready
@@ -123,6 +139,8 @@
 		  (when *verbose* (format t "~A~%" move-or-stop-or-timeout))
 		  (cond
 		    ((typep m 'stop)
+                     (format t "stop msg = ~A~%" move-or-stop-or-timeout)
+                     (game-logger-add-scores (stop-scores m))
                      (progn
                        (format t "Game stop.~%")
                        (when (typep (state player) 'game-with-scores)
@@ -146,7 +164,12 @@
       ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)
-             (game-logger-print "game.json")))))
+             (game-logger-print
+              (format nil "~A-~A-~A-~A"
+                      team-name
+                      (get-player-name player)
+                      port
+                      (get-internal-real-time)))))))
 
 (defun format-std (str &rest params)
   (apply #'format *standard-output* str params)
@@ -212,6 +235,12 @@
           (t (debug-log "Timeout.~%")))))
     )
   )
+
+(defun run-players-on-port (players port)
+  "Runs players from the PLAYERS list on game with port PORT"
+  (dolist (player players)
+    (sb-thread:make-thread
+     (lambda () (main-online port player)))))
 
 (defclass bot ()
   ((id :accessor id
