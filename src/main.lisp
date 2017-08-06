@@ -77,9 +77,11 @@
 (defun game-logger-set-punter (punter)
   (setf (game-log-punter *game-log*) punter))
 
-(defun game-logger-print (file-name)
-  (let ((*yason-lisp-readable-encode* nil))
-    (with-open-file (stream file-name :direction :output :if-exists :supersede :if-does-not-exist :create)
+(defun game-logger-print (tag)
+  (let ((*yason-lisp-readable-encode* nil)
+        (path (make-pathname :directory (list :relative "log") :name tag :type "json")))
+    (ensure-directories-exist path)
+    (with-open-file (stream path :direction :output :if-exists :supersede :if-does-not-exist :create)
       (yason:with-output (stream)
         (yason:with-object ()
           (yason:encode-object-element "map" (game-log-map *game-log*))
@@ -98,12 +100,13 @@
         (*game-log* (make-instance 'game-log))
 	(s)
         (setup-ht)
-        (the-state))
+        (the-state)
+        (team-name "SpiritRaccoons"))
     (unwind-protect
 	 (progn
 	   ;; send me
 	   (format t "Sending me...~%")
-	   (tcp-send socket (encode-me "SpiritRaccoons"))
+	   (tcp-send socket (encode-me team-name))
 	   ;; get you
 	   (format t "Getting you... ~A~%" (tcp-read socket))
 	   ;; get setup
@@ -158,7 +161,9 @@
       ;; (dump-state (state player) "~/g.dot")
       (progn (format t "~&Closing listen socket~%")
 	     (sb-bsd-sockets:socket-close socket)
-             (game-logger-print "game.json")))))
+             (game-logger-print
+              (format nil "~A-~A-~A"
+                      team-name (get-player-name player) port))))))
 
 (defun format-std (str &rest params)
   (apply #'format *standard-output* str params)

@@ -9,6 +9,7 @@
    #:init-player
    #:update-player
    #:select-move
+   #:get-player-name
    #:game-player
    #:cowboy-player
    #:connector-player
@@ -48,6 +49,10 @@
 (defgeneric init-player (player setup-message))
 (defgeneric update-player (player moves))
 (defgeneric select-move (player))
+(defgeneric get-player-name (player))
+
+(defmethod get-player-name (player)
+  (symbol-name (class-name (class-of player))))
 
 (defmethod init-player ((player game-player) setup-message)
   (setf (state player) (make-game-state setup-message))
