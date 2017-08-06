@@ -14,7 +14,7 @@ function show_history_file() {
         var bb = bounding_box(map.sites);
         var w = bb.max_x - bb.min_x;
         var h = bb.max_y - bb.min_y;
-        var node_size = (w > h ? w : h) / 20;
+        var node_size = Math.sqrt((w * h / map.sites.length) * 0.07);
         var line_width = node_size * 0.5;
         var mine_size = node_size * 1.5;
 
