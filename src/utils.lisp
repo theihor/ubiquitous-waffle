@@ -1,7 +1,8 @@
 (uiop:define-package :src/utils
     (:use :common-lisp)
   (:export
-   #:copy-instance))
+   #:copy-instance
+   #:copy-hash-table))
 
 (in-package :src/utils)
 
@@ -13,3 +14,13 @@
           (setf (slot-value copy slot-name)
                 (slot-value object slot-name)))))
     (apply #'reinitialize-instance copy initargs)))
+
+(defun copy-hash-table (ht &key (val-copy-func nil))
+  (let ((new (make-hash-table :test #'equal)))
+    (maphash (lambda (k v)
+               (setf (gethash k new)
+                     (if val-copy-func
+                         (funcall val-copy-func v)
+                         v)))
+             ht)
+    new))
