@@ -140,11 +140,13 @@
   (apply #'format *standard-output* str params)
   (finish-output *standard-output*))
 
-(defparameter *do-logging* nil)
+(defparameter *do-logging* t)
+(defparameter *logger-name* "punter")
 
 (defun debug-log (str &rest params)
   (when *do-logging*
-    (format *error-output* str params)))
+    (format *error-output* "~A: " *logger-name*)
+    (apply #'format *error-output* str params)))
 
 ;; via stdin, stdout, stderr
 (defun main-offline ()
@@ -157,11 +159,13 @@
     (debug-log "Sending me...~%")
     
     (format-std "~A" (encode-me "SpiritRaccoons"))
+    (debug-log "Sent me~%")
     (debug-log "Getting you... ~A~%" (read-with-size stdin))
     
     (let ((msg (read-with-size stdin)))
       (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
+        (debug-log "m: ~A~%" m)
         (cond 
           ((typep m 'setup)
            (debug-log "Init new player.~%")
@@ -198,8 +202,9 @@
 
 (defun main-simulator ()
   (when sb-ext:*posix-argv*
-    (let* ((output *standard-output*)
-           (input *standard-input*)
+    (let* ((*logger-name* "simulator")
+           ;; (output *standard-output*)
+           ;; (input *standard-input*)
            (botlist (cdr (apply-argv:parse-argv* sb-ext:*posix-argv*)))
            (botloop (copy-list botlist))
            (game-map (parse-map (get-random-map-json)))
@@ -214,10 +219,14 @@
       (loop :for bot :in botloop
          ;; :for steps := 0 :then (1+ steps)
          :while (< steps rivers) :do
-         (progn
+         (let* ((bot-process (sb-ext:run-program
+                              bot nil :output :stream :input :stream
+                              :error *error-output* :wait nil))
+                (input (sb-ext:process-output bot-process))
+                (*standard-output* (sb-ext:process-input bot-process)))
            ;; run bot with in/out piping
            (debug-log "Running bot ~a~%" bot)
-           (sb-ext:run-program bot nil :output input :input output)
+           
            ;; perfom handshake
            (debug-log "Reading message~%")
            (let ((id (parse-me (read-with-size input))))
@@ -242,12 +251,15 @@
                          (parse-ready (read-with-size input)))))))
          :finally
          (dolist (bot botlist)
-           ;; open in/out pipes
-           (sb-ext:run-program bot nil :output input :input output)
-           ;; perform handshake
-           (let ((id (parse-me (read-with-size input))))
-             (debug-log "Getting ID... ~a~%" id)
-             (format-std "~A" (encode-you id)))
+           (let* ((bot-process (sb-ext:run-program
+                                bot nil :output :stream :input :stream
+                                :error *error-output* :wait nil))
+                  (input (sb-ext:process-output bot-process))
+                  (*standard-output* (sb-ext:process-input bot-process)))
+             ;; perform handshake
+             (let ((id (parse-me (read-with-size input))))
+               (debug-log "Getting ID... ~a~%" id)
+               (format-std "~A" (encode-you id))))
            ;; send stop message
            (debug-log "Sending stop to ~a...~%" bot)
            (format-std (encode-stop moves scores-table)))))))
