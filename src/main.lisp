@@ -104,16 +104,14 @@
 
 	     ;; send ready
              (format t "Sending ready...~%")
-             (let ((futures (player-futures player)))
-               (when *verbose*
-                 (format t "Bid on futures:")
-                 (mapcar #'yason:encode futures)
-                 (format t "~%"))
-               (tcp-send
-                socket
-                (encode-ready (setup-punter s)
-                              :futures futures)))
-         (game-logger-setup setup-ht (player-futures player))
+             (when *verbose*
+	       (format t "Bid on futures:")
+	       (mapcar #'yason:encode (player-futures player))
+	       (format t "~%"))
+	     (tcp-send socket
+		       (encode-ready (setup-punter s)
+				     :futures (player-futures player)))
+	     (game-logger-setup setup-ht (player-futures player))
 	     ;; loop for moves until stop
 	     (loop
 		;; get move
