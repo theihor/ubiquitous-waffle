@@ -114,7 +114,7 @@
    (with-output-to-string (stream)
      (yason:with-output (stream)
        (yason:with-object ()
-         (yason:encode-object-element "move" moves)
+         (yason:encode-object-element "moves" moves)
          (yason:encode-object-element "state" state))))))
 
 (defun encode-stop (moves scores)

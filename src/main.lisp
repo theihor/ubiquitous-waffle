@@ -40,9 +40,7 @@
   (case state
     (0 (let ((c (read-char stream)))
 	 (if (char= c #\:)
-	     (progn
-           (debug-log "size = ~A~%" size)
-           (read-with-size stream (parse-integer size) 1))
+	     (read-with-size stream (parse-integer size) 1)
 	     (read-with-size stream (concatenate 'string size (string c)) 0))))
     (1 (let* ((str (make-string size)))
 	 (read-sequence str stream)
@@ -198,7 +196,7 @@
     (debug-log "Getting you... ~A~%" (read-with-size stdin))
     
     (let ((msg (read-with-size stdin)))
-      (debug-log "From server: ~A~%" msg)
+      ;; (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
         (debug-log "m: ~A~%" m)
         (cond 
@@ -229,7 +227,7 @@
                     (dummy2 (debug-log "Move selected...~%"))
                     (encoded-move (encode-move new-move)))
                (declare (ignorable dummy dummy2))
-               (debug-log "Sending move... ~A~%" encoded-move)
+               (debug-log "Sending move...~%")
                (format-std "~A" encoded-move)))
            )
           (t (debug-log "Timeout.~%")))))
@@ -254,6 +252,8 @@
 
 (defun restart-bot (bot)
   (awhen (process bot)
+         (close (sb-ext:process-input it))
+         (close (sb-ext:process-output it))
          (sb-ext:process-kill it 9))
   (setf (process bot)
         (sb-ext:run-program
@@ -284,6 +284,8 @@
     
     (setf (cdr (last botloop)) botloop)
 
+    (debug-log "rivers: ~A~%" rivers)
+    
     (loop :for bot :in botloop
        ;; :for steps := 0 :then (1+ steps)
        :while (< steps rivers) :do
@@ -291,6 +293,8 @@
          (restart-bot bot)
          (unless (id bot)
            (setf (id bot) (incf new-id)))
+
+         (debug-log "step: ~A~%" steps)
          
          ;; run bot with in/out piping
          (debug-log "Running bot ~A: ~a~%" (id bot) (program-name bot))
