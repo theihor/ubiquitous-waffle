@@ -32,7 +32,18 @@
       <div id="time_info" style="display: inline-block;">time info</div>
       &nbsp
       <div id="move_info" style="display: inline-block;">move info</div>
+      <div style="display: inline-block; float: right">
+        &nbsp
+        Player to show:
+        &nbsp
+        <select id="player_selector" onchange="show_player()">
+          <option>no players</option>
+        </select>
+      </div>
+      <div style="display: inline-block; min-width: 20px; min-height: 20px; background-color: GoldenRod; float: right;">
+      </div>
     </div>
+    <!-- <script src="http://code.jquery.com/jquery-3.2.1.js"></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.1.4/cytoscape.js"></script>
     <script src="main.js"></script>
     <script type="text/javascript">

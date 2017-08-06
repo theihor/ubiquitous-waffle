@@ -17,6 +17,29 @@ function show_history_file() {
         var node_size = (w > h ? w : h) / 20;
         var line_width = node_size * 0.5;
         var mine_size = node_size * 1.5;
+
+        var players = [ "all" ];
+        for (var move of json.moves) {
+            var punter = null;
+            if ("claim" in move) punter = move.claim.punter;
+            if ("pass" in move) punter = move.pass.punter;
+            if (punter != null && players.indexOf(punter) === -1)
+                players.push(punter);
+        }
+
+        document.players_number = players.length - 1;
+
+        var player_selector = document.getElementById("player_selector");
+
+        for(var i = player_selector.options.length - 1 ; i >= 0 ; i--)
+            player_selector.remove(i);
+
+        for (var value of players) {
+            var opt = document.createElement('option');
+            opt.text = value;
+            opt.value = value;
+            player_selector.add(opt, null);
+        }
         
         if (document.cy)
             document.cy.destroy();
@@ -55,16 +78,18 @@ function show_history_file() {
 
         document.timestamp = 0;
         document.moves = json.moves;
-        document.palette = [ "GoldenRod",
-                             "DarkTurquoise",
-                             "DarkMagenta",
-                             "Blue",
-                             
-                             "Coral",
-                             "DeepPink",
-                             "Indigo",
-                             "LightSeaGreen",
-                           ]
+        document.default_palette =
+            [ "GoldenRod",
+              "DarkTurquoise",
+              "DarkMagenta",
+              "Blue",
+              
+              "Coral",
+              "DeepPink",
+              "Indigo",
+              "LightSeaGreen",
+            ];
+        document.palette = document.default_palette;
     };
     reader.readAsText(file);
 }
@@ -191,4 +216,19 @@ function history_goto_aux(number) {
 
 function history_max() {
     history_goto_aux(document.moves.length);
+}
+
+function show_player() {
+    var selector = document.getElementById("player_selector");
+    var p = selector.value;
+    if (p == "all") {
+        document.palette = document.default_palette;
+    } else {
+        var palette = [];
+        for (var i = 0; i < document.players_number; ++i)
+            palette.push("DarkMagenta");
+        palette[p] = "GoldenRod";
+        document.palette = palette;
+    }
+    history_goto_aux(document.timestamp);
 }
