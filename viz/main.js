@@ -46,7 +46,7 @@ function show_history_file() {
         var cy = cytoscape({
             container: document.getElementById("cy"),
             style: 
-"node { background-color: black; width: " + node_size + "; height: " + node_size + "; }" +
+"node { background-color: DarkGray; width: " + node_size + "; height: " + node_size + "; }" +
 "edge { width: " + line_width + "; line-color: lightgray; }"
         });
         document.cy = cy;
@@ -226,8 +226,8 @@ function show_player() {
     } else {
         var palette = [];
         for (var i = 0; i < document.players_number; ++i)
-            palette.push("DarkMagenta");
-        palette[p] = "GoldenRod";
+            palette.push("PeachPuff");
+        palette[p] = "SeaGreen";
         document.palette = palette;
     }
     history_goto_aux(document.timestamp);
