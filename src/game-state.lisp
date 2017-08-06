@@ -121,8 +121,16 @@
                     :initial-contents (mapcar #'clone-punter (coerce (punters state) 'list)))))
 
 (defun clone-punter (punter)
-  (copy-instance punter
-                 :graph (clone-graph (punter-graph punter))))
+  (copy-instance
+   punter
+   :graph (clone-graph (punter-graph punter))
+   :mine->sites (copy-hash-table
+                 (src/punter::mine->sites punter)
+                 :val-copy-func #'copy-hash-table)
+   :site->mines (copy-hash-table
+                 (src/punter::site->mines punter)
+                 :val-copy-func #'copy-hash-table)
+   ))
 
 (defmethod process-moves ((state game-with-scores) moves)
   (let ((the-map (game-map state)))
