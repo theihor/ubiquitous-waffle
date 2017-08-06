@@ -92,12 +92,28 @@ function show_history_file() {
             ]);
 	    cy.edges("#future_" + future.source + "_" + future.target)
 		.forEach(function(edge) {
-		    edge.style("line-color", "orange");
-		    edge.style("opacity", "0.2");
+		    edge.style("line-color", "blue");
+		    edge.style("opacity", "0.3");
 		    edge.style("z-index", 0);
 		});
 		    
         });
+	// cy.on('mouseover', 'node', function(evt){
+	//     var node = evt.target;
+	//     console.log('mouseover ' + node.id());
+	//     json.futures.forEach(function (future) {
+	// 	if (future.source == node.id()) {
+	// 	    cy.edges("#future_" + future.source + "_" + future.target)
+	// 		.forEach(function(edge) {
+	// 		    edge.style("line-color", "blue");
+	// 		    edge.style("opacity", "0.2");
+	// 		    edge.style("z-index", 0);
+	// 		});
+	// 	}
+	//     });
+	// });
+	
+
         cy.fit();
 
         document.timestamp = 0;
