@@ -35,7 +35,14 @@
           :initarg :state
           :initform nil)
    (futures :initarg :futures 
-            :accessor player-futures)))
+            :accessor player-futures)
+   (verbose :initarg :verbose
+            :accessor verbose
+            :initform nil)))
+
+(defmacro player-log (player str &rest params)
+  `(when (verbose ,player)
+     (format *error-output* ,str ,@params)))
 
 (defgeneric make-player (player-class &rest params))
 (defgeneric init-player (player setup-message))
@@ -488,17 +495,19 @@
                    (%tricky-check-locations)
                    (%do-move-non-tricky)))
              (%tricky-check-locations ()
-               (loop :for location :in locations
-                  :do (unless (hash-tables-intersect? current-network (cluster location))
-                        (let ((freedom (cluster-freedom avail-graph (cluster location))))
-                          (when (and freedom
-                                     (> freedom 0)
-                                     (< freedom 5))
-                            (multiple-value-bind (src trgt)
-                                (extend-cluster avail-graph (cluster location))
-                              ;; (format t "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
-                              ;;         (node location) freedom src trgt)
-                              (return-from %tricky-check-locations (make-claim state src trgt)))))))
+               (let ((network-freedom (cluster-freedom avail-graph current-network)))
+                 (loop :for location :in locations
+                    :do (unless (hash-tables-intersect? current-network (cluster location))
+                          (let ((freedom (cluster-freedom avail-graph (cluster location))))
+                            (when (and freedom
+                                       (> freedom 0)
+                                       (< freedom 3)
+                                       (< (+ freedom 2) network-freedom))
+                              (multiple-value-bind (src trgt)
+                                  (extend-cluster avail-graph (cluster location))
+                                (player-log player "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
+                                            (node location) freedom src trgt)
+                                (return-from %tricky-check-locations (make-claim state src trgt))))))))
                (%do-move-tricky))
              (%do-move-non-tricky ()
                (if locations
@@ -519,9 +528,9 @@
                    (let ((next-location (car locations)))
                      (let ((path
                             (find-regions-connecting-move avail-graph current-network (cluster next-location))))
-                       ;; (format t "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
-                       ;;         (alexandria:hash-table-keys (cluster next-location))
-                       ;;         path)
+                       (player-log player "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
+                                   (alexandria:hash-table-keys (cluster next-location))
+                                   path)
                        (cond ((or (null path)
                                   (null (cdr path)))
                               (let ((claimed-location (pop locations)))
@@ -534,7 +543,7 @@
              (%do-random-move ()
                (let ((max-move (find-best-non-targeted-move avail-graph current-network
                                                             (distance-tab state) claimed-mines)))
-                 ;; (format t "Random move : ~A~%" max-move)
+                 (player-log player "Random move : ~A~%" max-move)
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
                      (%try-not-reached))))
