@@ -79,7 +79,8 @@
   (make-instance
    'settings
    :futures (when settings-ht
-              (gethash "futures" settings-ht))))
+              (gethash "futures" settings-ht)
+              (gethash "splurges" settings-ht))))
 
 (defun parse-setup-inner (setup-ht)
   (make-instance
