@@ -81,6 +81,15 @@
   (dolist (m moves)
     (etypecase m
       (pass nil)
+      (splurge
+       (let ((id (move-punter m))
+             (route (splurge-route m)))
+         (assert (integerp id))
+         (loop :for (src trgt) :on route
+            :do (unless (null trgt)
+                  (assert (integerp src))
+                  (assert (integerp trgt))
+                  (funcall func id src trgt)))))
       (claim
        (let ((id (move-punter m))
              (src (claim-source m))
