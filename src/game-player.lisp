@@ -26,7 +26,7 @@
    #:futures
    #:find-regions-connecting-move))
 
-(declaim (optimize (debug 0) (safety 0) (speed 0)))
+(declaim (optimize (debug 0) (safety 0) (speed 3)))
 
 (in-package :src/game-player)
 
