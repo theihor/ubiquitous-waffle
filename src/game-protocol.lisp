@@ -21,6 +21,7 @@
            #:pass
            #:splurge
            #:splurge-route
+           #:option
            #:stop
            #:stop-moves
            #:stop-scores
@@ -45,7 +46,8 @@
 
 (defclass settings ()
   ((futures :initarg :futures :accessor settings-futures)
-   (splurges :initarg :splurges :accessor settings-splurges)))
+   (splurges :initarg :splurges :accessor settings-splurges)
+   (options :initarg :options :accessor settings-options)))
 
 (defclass future ()
   ((source :initarg :source :accessor future-source)
@@ -76,6 +78,8 @@
 
 (defclass splurge (move)
   ((route :initarg :route :accessor splurge-route)))
+
+(defclass option (claim) ())
 ;;;
 
 (defclass stop ()
