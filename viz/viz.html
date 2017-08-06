@@ -1,0 +1,32 @@
+<html>
+  <header>
+    <meta charset="utf-8">
+    <title>History Viewer</title>
+    <style>
+      #cy {
+      width: 300px;
+      height: 300px;
+      display: block;
+      }
+    </style>
+  </header>
+  <body>
+    <div>
+      History file:
+      <input type="file" id="hfile">
+      <button type="button" onclick="show_history_file();">Show</button>
+    </div>
+    <br>
+    <div id="cy">
+    </div>
+    <br>
+    <div>
+      <button type="button" onclick="history_backward()">&lt</button>
+      <button type="button" onclick="history_forward()">&gt</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.1.4/cytoscape.js"></script>
+    <script src="main.js"></script>
+    <script type="text/javascript">
+    </script>
+  </body>
+</html>
