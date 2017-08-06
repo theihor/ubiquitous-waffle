@@ -9,17 +9,25 @@ function show_history_file() {
     reader.onload = function () {
         var text = reader.result;
         var json = JSON.parse(text);
-        var map = json["map"];
+        var map = json.map;
+
+        var bb = bounding_box(map.sites);
+        var w = bb.max_x - bb.min_x;
+        var h = bb.max_y - bb.min_y;
+        var node_size = (w > h ? w : h) / 20;
+        var line_width = node_size * 0.5;
+        var mine_size = node_size * 1.5;
+        
         if (document.cy)
             document.cy.destroy();
         var cy = cytoscape({
             container: document.getElementById("cy"),
             style: 
-"node { background-color: black; width: 0.1; height: 0.1; }" +
-"edge { width: 0.05; line-color: lightgray; }"
+"node { background-color: black; width: " + node_size + "; height: " + node_size + "; }" +
+"edge { width: " + line_width + "; line-color: lightgray; }"
         });
         document.cy = cy;
-        map["sites"].forEach(function (site) {
+        map.sites.forEach(function (site) {
             cy.add([
                 { group: "nodes",
                   data: { id: "node_" + site.id },
@@ -39,8 +47,8 @@ function show_history_file() {
         map.mines.forEach(function (mine) {
             cy.nodes("#node_" + mine).forEach(function(node) {
                 node.style("background-color", "red");
-                node.style("width", "0.15");
-                node.style("height", "0.15");
+                node.style("width", mine_size);
+                node.style("height", mine_size);
             });
         });
         cy.fit();
@@ -96,4 +104,33 @@ function make_edge_id(from, to) {
         return "edge_" + from + "_" + to;
     else
         return "edge_" + to + "_" + from;
+}
+
+function bounding_box(sites) {
+    var r = {  min_x: null,
+               max_x: null,
+               min_y: null,
+               max_y: null
+            }
+    sites.forEach(function (site) {
+        if (r.min_x == null) {
+            if (r.min_x > site.x)
+                r.min_x = site.x;
+            if (r.max_x < site.x)
+                r.max_x = site.x;
+            
+            if (r.min_y > site.y)
+                r.min_y = site.y;
+            if (r.max_y < site.y)
+                r.max_y = site.y;
+            console.log("min x: " + r.min_x + " max x: " + r.max_x);
+        } else {
+            r.min_x = site.x;
+            r.max_x = site.x;
+            r.min_y = site.y;
+            r.max_y = site.y;
+        }
+    });
+
+    return r;
 }
