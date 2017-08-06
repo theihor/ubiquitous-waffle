@@ -483,6 +483,10 @@
     (labels ((%claim (location)
                (when (mine-location? location)
                  (push (node location) claimed-mines)))
+             (%do-move ()
+               (if tricky
+                   (%tricky-check-locations)
+                   (%do-move-non-tricky)))
              (%tricky-check-locations ()
                (loop :for location :in locations
                   :do (unless (hash-tables-intersect? current-network (cluster location))
@@ -496,7 +500,7 @@
                               ;;         (node location) freedom src trgt)
                               (return-from %tricky-check-locations (make-claim state src trgt)))))))
                (%do-move-tricky))
-             (%do-move ()
+             (%do-move-non-tricky ()
                (if locations
                    (let ((next-location (car locations)))
                      (multiple-value-bind (src trgt)
@@ -507,7 +511,7 @@
                                 (if (eq src t)
                                     (%claim claimed-location)
                                     (push claimed-location not-reached-locations)))
-                              (%do-move))
+                              (%do-move-non-tricky))
                              (t (make-claim state src trgt)))))
                    (%do-random-move)))
              (%do-move-tricky ()
@@ -530,6 +534,7 @@
              (%do-random-move ()
                (let ((max-move (find-best-non-targeted-move avail-graph current-network
                                                             (distance-tab state) claimed-mines)))
+                 ;; (format t "Random move : ~A~%" max-move)
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
                      (%try-not-reached))))
@@ -563,6 +568,4 @@
                        (setf locations nil))))))
       (when (= (hash-table-count current-network) 0)
         (%init-locations starting-locations))
-      (if tricky
-          (%tricky-check-locations)
-          (%do-move)))))
+      (%do-move))))
