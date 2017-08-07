@@ -18,7 +18,8 @@
            #:game
            #:game-with-scores
            #:clone-game
-           #:score))
+           #:score
+           #:sites))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -31,7 +32,7 @@
           :reader mines
           :type list)
    (sites :initarg :sites
-          :reader sites
+          :accessor sites
           :type list)
    (id :initarg :id
        :reader id
@@ -196,3 +197,6 @@
                          targets))
                       (graph-edges (punter-graph p)))))
     (format s "}~%")))
+
+
+

@@ -60,7 +60,8 @@
   (setf (player-futures player) nil))
 
 (defmethod update-player ((player game-player) moves)
-  (process-moves (state player) moves))
+  ;; (process-moves (state player) moves)
+  )
 
 (defclass cowboy-player (game-player)
   ((avail-list :accessor avail-list
@@ -424,6 +425,10 @@
 (defmethod make-player ((player-class (eql 'connector-player)) &rest params)
   (apply #'make-instance 'connector-player params))
 
+(defun clear-state (state)
+  (setf (game-map state) nil)
+  (setf (sites state) nil))
+
 (defmethod init-player :after ((player connector-player) setup-message)
   (with-slots (avail-graph state current-network gambling tricky futures) player
     (setf avail-graph (clone-graph (game-map state)))
@@ -460,7 +465,8 @@
                         (if tricky
                             (make-location :mine node :cluster (singleton-hash-table node))
                             (make-location :mine node)))
-                      sorted))))))
+                      sorted))))
+    (clear-state state)))
 
 (defmethod update-player :after ((player connector-player) moves)
   (with-slots (current-network avail-graph state locations tricky) player
