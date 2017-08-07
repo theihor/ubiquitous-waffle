@@ -45,9 +45,9 @@
    (setting :initarg :settings :accessor setup-settings :initform nil)))
 
 (defclass settings ()
-  ((futures :initarg :futures :accessor settings-futures)
-   (splurges :initarg :splurges :accessor settings-splurges)
-   (options :initarg :options :accessor settings-options)))
+  ((futures :initarg :futures :accessor settings-futures :initform nil)
+   (splurges :initarg :splurges :accessor settings-splurges :initform nil)
+   (options :initarg :options :accessor settings-options :initform nil)))
 
 (defclass future ()
   ((source :initarg :source :accessor future-source)

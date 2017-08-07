@@ -10,6 +10,7 @@
                :src/game-player
                :src/decode
                :src/mcts
+               :src/simulator
 
                ;; :cl-rl
                ;; :src/rl/player

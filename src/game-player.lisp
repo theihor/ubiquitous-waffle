@@ -450,6 +450,10 @@
 (defmethod make-player ((player-class (eql 'connector-player)) &rest params)
   (apply #'make-instance 'connector-player params))
 
+(defun clear-state (state)
+  (setf (game-map state) nil)
+  (setf (sites state) nil))
+
 (defun mines-table (mines)
   (let ((tab (make-hash-table :test #'equal)))
     (loop :for mine :in mines
@@ -501,7 +505,8 @@
                          :mine
                          :future)))
         ;; Start from first
-        (setf (gethash (car sorted) current-network) t)))))
+        (setf (gethash (car sorted) current-network) t)
+        (clear-state state)))))
 
 (defmethod update-player :after ((player connector-player) moves)
   (with-slots (current-network avail-graph avail-option-graph

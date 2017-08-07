@@ -4,6 +4,9 @@ online:
 offline:
 	sbcl --load build-offline.lisp "$@"
 
+simulator:
+	sbcl --load build-simulator.lisp "$@"
+
 clean:
 	rm -f online
 	rm -f punter

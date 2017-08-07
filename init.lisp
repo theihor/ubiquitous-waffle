@@ -13,11 +13,12 @@
 ;; (ql:quickload 'cl-heap)
 ;; (ql:quickload 'spatial-trees)
 ;; (ql:quickload 'spatial-trees.nns)
-;; (ql:quickload 'apply-argv)
+(ql:quickload 'apply-argv)
 ;; (ql:quickload 'ironclad)
 ;; (ql:quickload 'babel)
 ;; (ql:quickload 'cl-svg)
 (ql:quickload 'yason)
+(ql:quickload 'drakma)
 ;; (ql:quickload 'cl-geometry)
 ;; (ql:quickload 'smug)
 (ql:quickload 'anaphora)
@@ -36,6 +37,7 @@
 (ql:quickload 'cl-ppcre)
 (ql:quickload 'cl-mop)
 
+(ql:quickload 'trivial-timeout)
 ;; (ql:quickload :cl-rl)
 
 (in-package :cl-user)
