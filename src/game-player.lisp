@@ -28,7 +28,7 @@
    #:find-regions-connecting-move
    #:location))
 
-(declaim (optimize (debug 0) (safety 0) (speed 3)))
+(declaim (optimize (debug 0) (safety 0) (speed 0)))
 
 (in-package :src/game-player)
 
@@ -60,7 +60,8 @@
   (setf (player-futures player) nil))
 
 (defmethod update-player ((player game-player) moves)
-  (process-moves (state player) moves))
+  ;; (process-moves (state player) moves)
+  )
 
 (defclass cowboy-player (game-player)
   ((avail-list :accessor avail-list
@@ -96,6 +97,23 @@
                  :source src
                  :target trgt
                  :punter (id state))
+  ;; (make-instance 'splurge
+  ;;                :punter (id state)
+  ;;                :route (list src trgt))
+  )
+
+(defun make-claim-player (player src trgt)
+  (with-slots (state avail-graph)
+      player
+    (if (get-edge avail-graph src trgt)
+        (make-instance 'claim
+                       :source src
+                       :target trgt
+                       :punter (id state))
+        (make-instance 'option
+                       :source src
+                       :target trgt
+                       :punter (id state))))
   ;; (make-instance 'splurge
   ;;                :punter (id state)
   ;;                :route (list src trgt))
@@ -153,6 +171,10 @@
 (defclass connector-player (game-player)
   ((avail-graph :accessor avail-graph
                 :initform nil)
+   (avail-option-graph :accessor avail-option-graph
+                       :initform nil)
+   (avail-options :accessor avail-options
+                  :initform 0)
    (current-network :accessor current-network
                     :initform nil)
    (claimed-mines :accessor claimed-mines
@@ -164,7 +186,10 @@
              :initarg :gambling)
    (tricky :accessor tricky
            :initform nil
-           :initarg :tricky)))
+           :initarg :tricky)
+   (use-options :accessor use-options
+                :initform nil
+                :initarg :use-options)))
 
 (defun find-connecting-move (graph current-network target)
   (if (gethash target current-network)
@@ -432,10 +457,16 @@
     tab))
 
 (defmethod init-player :after ((player connector-player) setup-message)
-  (with-slots (avail-graph state current-network gambling tricky futures
-                           locations-table)
+  (with-slots (avail-graph avail-option-graph
+                           avail-options
+                           state current-network gambling tricky futures
+                           locations-table
+                           use-options)
       player
     (setf avail-graph (clone-graph (game-map state)))
+    (when use-options
+      (setf avail-option-graph (clone-graph avail-graph))
+      (setf avail-options (length (mines state))))
     (setf current-network (make-hash-table :test #'equal))
     (let* ((mines (mines state))
            ;; (mine-scores
@@ -473,11 +504,20 @@
         (setf (gethash (car sorted) current-network) t)))))
 
 (defmethod update-player :after ((player connector-player) moves)
-  (with-slots (current-network avail-graph state locations-table tricky) player
+  (with-slots (current-network avail-graph avail-option-graph
+                               avail-options
+                               state locations-table tricky
+                               use-options)
+      player
     (mapc-claims
      moves
      (lambda (id src trgt)
-       (remove-edge avail-graph src trgt)
+       (if (get-edge avail-graph src trgt)
+           (remove-edge avail-graph src trgt)
+           (when use-options
+             (when (= id (id state))
+               (decf avail-options))
+             (remove-edge avail-option-graph src trgt)))
        (when (= id (id state))
          (if (or (gethash src current-network)
                  (gethash trgt current-network))
@@ -531,9 +571,12 @@
     adj))
 
 (defmethod select-move ((player connector-player))
-  (with-slots (avail-graph current-network locations-table
-                           state claimed-mines
-                           tricky)
+  (with-slots (avail-graph
+               avail-option-graph
+               avail-options
+               current-network locations-table
+               state claimed-mines
+               tricky)
       player
     (labels ((%claim (location kind)
                (when (eq kind :mine)
@@ -562,22 +605,15 @@
                               (%any-move moves)
                             (player-log player "Tricky freedom: ~A, extending: ~A -> ~A~%"
                                         (hash-table-count moves) src trgt)
-                            (return-from %tricky-check-locations (make-claim state src trgt)))))))
+                            (return-from %tricky-check-locations (make-claim-player player src trgt)))))))
                   locations-table))
-               ;; (let ((network-freedom (cluster-freedom avail-graph current-network)))
-               ;;   (loop :for location :in locations
-               ;;      :do (unless (hash-tables-intersect? current-network (cluster location))
-               ;;            (let ((freedom (cluster-freedom avail-graph (cluster location))))
-               ;;              (when (and freedom
-               ;;                         (> freedom 0)
-               ;;                         (< freedom 3)
-               ;;                         (< (+ freedom 2) network-freedom))
-               ;;                (multiple-value-bind (src trgt)
-               ;;                    (extend-cluster avail-graph (cluster location))
-               ;;                  (player-log player "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
-               ;;                              (node location) freedom src trgt)
-               ;;                  (return-from %tricky-check-locations (make-claim state src trgt))))))))
                (%do-move-targeted))
+             (%find-targeted-move ()
+               (let ((path (find-regions-connecting-move avail-graph current-network locations-table)))
+                 (if (and (null path)
+                          (> avail-options 0))
+                     (find-regions-connecting-move avail-option-graph current-network locations-table)
+                     path)))
              (%do-move-targeted ()
                (if (> (hash-table-count locations-table) 0)
                    (progn
@@ -586,8 +622,7 @@
                       locations-table
                       (lambda (node kind)
                         (%claim node kind)))
-                     (let ((path
-                            (find-regions-connecting-move avail-graph current-network locations-table)))
+                     (let ((path (%find-targeted-move)))
                        (player-log player "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
                                    (alexandria:hash-table-keys locations-table)
                                    path)
@@ -598,14 +633,14 @@
                           (%claim (car path) (gethash (car path) locations-table))
                           (remhash (car path) locations-table)
                           (%do-move-targeted))
-                         (t (make-claim state (first path) (second path))))))
+                         (t (make-claim-player player (first path) (second path))))))
                    (%do-random-move)))
              (%do-random-move ()
                (let ((max-move (find-best-non-targeted-move avail-graph current-network
                                                             (distance-tab state) claimed-mines)))
                  (player-log player "Random move : ~A~%" max-move)
                  (if max-move
-                     (make-claim state (car max-move) (cdr max-move))
+                     (make-claim-player player (car max-move) (cdr max-move))
                      (%reset-targets))))
              (%reset-targets ()
                (filter-alive-locs avail-graph locations-table)
@@ -638,6 +673,6 @@
              (%do-totally-random-move ()
                (let ((node (any-node avail-graph)))
                  (if node
-                     (make-claim state node (any-neighbour avail-graph node))
+                     (make-claim-player player node (any-neighbour avail-graph node))
                      (make-pass state)))))
       (%do-move))))
