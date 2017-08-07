@@ -1,17 +1,20 @@
 (defpackage :src/main
   (:nicknames :main)
-  (:use :common-lisp :src/decode :src/encode 
+  (:use :common-lisp :anaphora :src/decode :src/encode
         :src/game-protocol
         :src/game-player
         :src/future-player
         :src/punter
         :src/game-state
         :src/graph
-        :src/mcts-player))
+        :src/simulator
+        :src/mcts-player)
+  (:import-from :sb-sprof))
 
 (in-package :src/main)
 
 (require 'sb-bsd-sockets)
+
 
 ;; tcp
 (defparameter *punter-server* "punter.inf.ed.ac.uk")
@@ -175,28 +178,40 @@
   (apply #'format *standard-output* str params)
   (finish-output *standard-output*))
 
-(defparameter *do-logging* nil)
+(defparameter *do-logging* t)
+(defparameter *logger-name* "punter")
 
 (defun debug-log (str &rest params)
   (when *do-logging*
-    (format *error-output* str params)))
+    (format *error-output* "~A: " *logger-name*)
+    (apply #'format *error-output* str params)))
+
+(defmacro with-profiling (&body body)
+  `(progn (sb-sprof:reset)
+          (sb-sprof:start-profiling :max-samples 1000 :mode :time :sample-interval 0.001)
+          (progn ,@body)
+          (sb-sprof:stop-profiling)
+          (cl-user::sbcl-print-callgraph-in-dot-format "~/profile.dot")
+          ;; (sb-sprof:report :min-percent 1 :type :flat :stream *error-output*)
+          ))
 
 ;; via stdin, stdout, stderr
 (defun main-offline ()
 
   (let ((stdin *standard-input*)
         ;; (stdout *standard-output*)
-        (player (make-player 'connector-player :gambling t :tricky t))
+        (player (make-player 'connector-player :gambling t :tricky nil))
         (*package* (find-package :src/main)))
     
     (debug-log "Sending me...~%")
     
     (format-std "~A" (encode-me "SpiritRaccoons"))
+    (debug-log "Sent me~%")
     (debug-log "Getting you... ~A~%" (read-with-size stdin))
-    
     (let ((msg (read-with-size stdin)))
-      (debug-log "From server: ~A~%" msg)
+      ;; (debug-log "From server: ~A~%" msg)
       (multiple-value-bind (m state) (parse msg)
+        (debug-log "m: ~A~%" m)
         (cond
           ((numberp m)
            (debug-log "Failed with timeout ~A~%" m)
@@ -214,9 +229,10 @@
                (debug-log "Computed score:~%")
                (loop :for punter :below (players-number (state player))
                   :do (debug-log "~A :~A~%"
-                              punter
-                              (score (elt (punters (state player)) punter)))))))
-          ((typep (car m) 'move)
+                                 punter
+                                 (score (elt (punters (state player)) punter)))))))
+          ((or (null m)
+               (typep (car m) 'move))
            (debug-log "Getting new moves...~%")
            (when state
              (setf player state)
@@ -227,7 +243,7 @@
                     (dummy2 (debug-log "Move selected...~%"))
                     (encoded-move (encode-move new-move)))
                (declare (ignorable dummy dummy2))
-               (debug-log "Sending move... ~A~%" encoded-move)
+               (debug-log "Sending move...~%")
                (format-std "~A" encoded-move)))
            )
           (t (debug-log "Timeout.~%")))))
@@ -243,34 +259,125 @@
            (apply #'main-online port player)
            (main-online port player))))))
 
-;; (defun main ()
-;;   (when sb-ext:*posix-argv*
-;;     (let* ((parsed-args (apply-argv:parse-argv* ;;'("./test" "-f" "problems/problem_1.json")))
-;; 			 sb-ext:*posix-argv*))
-;; 	   (files) (phrases) (time) (memory) (proc-count))
-;;       ;;(format t "~A~%~A~%" parsed-args (alexandria:plist-alist (cdr parsed-args)))
-;;       (mapcar (lambda (p) 
-;; 		(let ((o (string (car p)))
-;; 		      (v (cdr p)))
-;; 		  (cond
-;; 		    ((string= "-f" o) (push v files))
-;; 		    ((string= "-p" o) (push v phrases))
-;; 		    ((string= "-c" o) (setq proc-count v))
-;; 		    ((string= "-m" o) (setq memory v))
-;; 		    ((string= "-t" o) (setq time (parse-integer v :junk-allowed t))))))
-;; 	      (alexandria:plist-alist (cdr parsed-args)))
-;;       (when time
-;;         (set-timeout time))
-;;       (setq *magic-words* phrases)
-;;       (setq *magic-words-cst* (make-command-seq-matching-tree phrases))
-;;       ;;(format t "~A~%" files)
-;;       (let ((result-list nil))
-;; 	(dolist (f (reverse files))			
-;; 	  (when (probe-file f)
-;; 	    ;;(format t "~A~%~%" (alexandria:read-file-into-string f))
-;;             (debug-log "Processing file ~A~%" f)
-;; 	    (setf result-list 
-;; 		  (append result-list (let ((*standard-output* *error-output*))
-;;                                         (simple-wave-from-task 
-;;                                          (decode-task (alexandria:read-file-into-string f)))))))) 
-;; 	(yason:encode result-list)))))
+(defclass bot ()
+  ((id :accessor id
+       :initform nil)
+   (name :accessor name)
+   (process :accessor process
+            :initform nil)
+   (setupped :accessor setupped)
+   (program-name :accessor program-name
+                 :initarg :program-name)))
+
+(defun restart-bot (bot)
+  (awhen (process bot)
+         (close (sb-ext:process-input it))
+         (close (sb-ext:process-output it))
+         (sb-ext:process-kill it 9))
+  (setf (process bot)
+        (sb-ext:run-program
+         (program-name bot) nil :output :stream :input :stream
+         :error *error-output* :wait nil)))
+
+(defun read-from-bot (bot)
+  (read-with-size (sb-ext:process-output (process bot))))
+
+(defun write-to-bot (bot str &rest args)
+  (let ((*standard-output* (sb-ext:process-input (process bot))))
+    (apply #'format-std str args)))
+
+(defun main-simulator-aux (botlist &key map-file)
+  (let* ((*logger-name* "simulator")
+         (*random-state* (make-random-state t))
+         (botlist (mapcar (lambda (name)
+                            (make-instance 'bot :program-name name))
+                          botlist))
+         (botloop (copy-list botlist))
+         (game-map (if map-file
+                       (parse-map-from-file map-file)
+                       (parse-map (get-random-map-json))))
+         (rivers (length (map-rivers game-map)))
+
+         (player-table (make-hash-table :test #'equal)) 
+         (scores-table (make-hash-table :test #'equal))
+
+         (moves)
+         (steps 0)
+         (new-id 0)) 
+    
+    (setf (cdr (last botloop)) botloop)
+
+    (debug-log "rivers: ~A~%" rivers)
+    
+    (loop :for bot :in botloop
+       ;; :for steps := 0 :then (1+ steps)
+       :while (< steps rivers) :do
+       (let* ()
+         (sb-ext:gc :full t)
+         (restart-bot bot)
+         (unless (id bot)
+           (setf (id bot) (incf new-id)))
+
+         (debug-log "step: ~A~%" steps)
+         
+         ;; run bot with in/out piping
+         (debug-log "Running bot ~A: ~a~%" (id bot) (program-name bot))
+         
+         ;; perfom handshake
+         (debug-log "Reading message~%")
+         (let ((name (parse-me (read-from-bot bot)))
+               (id (id bot)))
+           (setf (name bot) name)
+           (debug-log "Shook hands with ~a~%" name)
+           (write-to-bot bot "~A" (encode-you id))
+           ;; setup or continue
+           (handler-case
+               (if (gethash id player-table)
+                   (progn 
+                     (let* ((*yason-lisp-readable-encode* nil)
+                            (*trace-output* *error-output*)
+                            (encoded-moves
+                             (encode-moves moves (gethash id player-table)))
+                            (response 0))
+                       (trivial-timeout:with-timeout (1)
+                         (time
+                          (progn
+                            ;; send current moves and state
+                            (write-to-bot bot encoded-moves)
+                            (setf response (read-from-bot bot)))))
+                       ;; get next move
+                       (multiple-value-bind (move state)
+                           (parse-move-with-state response)
+                         (setf (gethash id player-table) state)
+                         (push move moves)))
+                     (incf steps))
+                   (progn
+                     (debug-log "Performing setup...~%")
+                     (write-to-bot bot
+                                   (encode-setup (make-setup id (length botlist) game-map)))
+                     ;; (debug-log "Sent: ~A~%" (encode-setup (make-setup id (length botlist) game-map)))
+                     (setf (gethash id player-table)
+                           (parse-ready (read-from-bot bot)))
+                     (setf (setupped bot) t)))          
+             (error (e) (debug-log "ERROR: ~A~%" e)))
+           ))
+       :finally
+       (dolist (bot botlist)
+         (restart-bot bot)
+         ;; perform handshake
+         (let ((name (parse-me (read-from-bot bot)))
+               (id (id bot)))
+           (debug-log "Getting ID... ~a ~A~%" name id)
+           (write-to-bot bot "~A" (encode-you id))
+           ;; send stop message
+           (debug-log "Sending stop to ~a...~%" id))
+         (write-to-bot bot (encode-stop moves scores-table))))))
+
+(defun main-simulator ()
+  (when sb-ext:*posix-argv*
+    (let* ((args (apply-argv:parse-argv (cdr sb-ext:*posix-argv*)))
+           (programs (first args)))
+      (main-simulator-aux programs
+                          :map-file (awhen (getf (cdr args) :map-file) it))
+      )))
+

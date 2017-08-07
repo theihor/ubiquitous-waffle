@@ -22,6 +22,7 @@ function show_history_file() {
         for (var move of json.moves) {
             var punter = null;
             if ("claim" in move) punter = move.claim.punter;
+	    if ("option" in move) punter = move.option.punter;
             if ("pass" in move) punter = move.pass.punter;
 	    if ("splurge" in move) punter = move.splurge.punter;
             if (punter != null && players.indexOf(punter) === -1)
@@ -176,7 +177,9 @@ function history_forward() {
         var move = document.moves[document.timestamp];
         update_move_info(move);
         if ("claim" in move)
-            mark_taken(move.claim)
+            mark_taken(move.claim);
+	if ("option" in move)
+            mark_option_taken(move.option);
 	if ("splurge" in move)
 	    mark_splurge_taken(move.splurge);
         document.timestamp++;
@@ -193,6 +196,8 @@ function history_backward() {
         update_move_info(move);
         if ("claim" in move)
             mark_free(move.claim);
+	if ("option" in move)
+	    mark_option_free(move.option);
 	if ("splurge" in move)
 	    mark_splurge_free(move.splurge);
     } else {
@@ -267,8 +272,22 @@ function mark_edge(edge, style) {
 
 function mark_free(claim) {
     mark_edge(claim, { "line-color": "lightgray",
+		       "line-style": "solid",
                        "z-index": 10
                      })
+}
+
+function mark_option_free(option) {
+    var palette = document.palette;
+    var focus_player = parseInt(document.getElementById("player_selector").value);
+    var z_index = 20;
+    if (focus_player == option.punter) {
+        z_index = 30;
+    mark_edge(option, {"line-color": palette[option.punter],
+		       "line-style": "dashed",
+                       "z-index": z_index
+                     });
+	}
 }
 
 function mark_splurge_free(splurge) {
@@ -288,6 +307,19 @@ function mark_taken(claim) {
     mark_edge(claim, { "line-color": palette[claim.punter],
                        "z-index": z_index
                      });
+}
+
+function mark_option_taken(option) {
+    var palette = document.palette;
+    var focus_player = parseInt(document.getElementById("player_selector").value);
+    var z_index = 20;
+    if (focus_player == option.punter) {
+        z_index = 30;
+	mark_edge(option, {"line-color": palette[focus_player],
+		       "line-style": "dashed",
+                       "z-index": z_index
+                     });
+	}
 }
 
 function mark_splurge_taken(splurge) {
@@ -311,6 +343,8 @@ function history_reset() {
     for (var move of document.moves) {
         if ("claim" in move)
             mark_free(move.claim);
+	if ("option" in move)
+	    mark_free(move.option);
 	if ("splurge" in move)
 	    mark_splurge_free(move.splurge);
     }
