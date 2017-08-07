@@ -2,7 +2,8 @@
     (:use :common-lisp
           :src/game-protocol
           :src/graph
-          :src/game-state)
+          :src/game-state
+          :src/k-shortest)
   (:import-from :alexandria)
   (:export
    #:make-player
@@ -627,11 +628,21 @@
                             (return-from %tricky-check-locations (make-claim-player player src trgt)))))))
                   locations-table))
                (%do-move-targeted))
+             (%path-num-options (path)
+               (loop :for (from to) :on path
+                  :when to
+                  :summing (if (get-edge avail-graph from to)
+                               0
+                               1)))
              (%find-targeted-move ()
                (let ((path (find-regions-connecting-move avail-graph current-network locations-table)))
                  (if (and (null path)
                           (> avail-options 0))
-                     (find-regions-connecting-move avail-option-graph current-network locations-table)
+                     ;;(find-regions-connecting-move avail-option-graph current-network locations-table)
+                     (let ((paths (k-shortest-between-regions avail-option-graph 3 '(:a :b)
+                                                              current-network locations-table)))
+                       (car (sort (copy-list paths) #'<
+                                  :key #'%path-num-options)))
                      path)))
              (%do-move-targeted ()
                (if (> (hash-table-count locations-table) 0)
