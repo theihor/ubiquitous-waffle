@@ -109,16 +109,6 @@
            "content" (alexandria:hash-table-plist obj))))
       (call-next-method)))
 
-(defmethod yason:encode ((obj cons) &optional stream)
-  (yason:with-output (stream)
-    (if (listp (cdr obj))
-        (yason:with-array ()
-          (dolist (x obj)
-            (yason:encode-array-element x)))
-        (yason:with-array ()
-          (yason:encode-array-element (car obj))
-          (yason:encode-array-element (cdr obj))))))
-
 (defmethod yason:encode ((obj symbol) &optional stream)
   (yason:with-output (stream)
     (let ((prefix (if (keywordp obj) ":" "#")))
