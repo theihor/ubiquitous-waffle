@@ -98,7 +98,7 @@
        'settings
        :futures (gethash "futures" settings-ht)
        :splurges (gethash "splurges" settings-ht)
-       :options (gethash "optoins" settings-ht))
+       :options (gethash "options" settings-ht))
       (make-instance 'settings)))
 
 (defun parse-setup-inner (setup-ht)

@@ -1,5 +1,7 @@
 (load #P"~/quicklisp/setup.lisp")
 
+(require 'sb-sprof)
+
 (ql:quickload 'asdf)
 
 (proclaim '(optimize (debug 3) (safety 3)))
@@ -41,8 +43,6 @@
 ;; (ql:quickload :cl-rl)
 
 (in-package :cl-user)
-
-(require 'sb-sprof)
 
 (asdf:initialize-source-registry '(:source-registry
                                    :inherit-configuration
