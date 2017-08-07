@@ -31,7 +31,9 @@
            #:settings
            #:future
            #:future-source
-           #:future-target))
+           #:future-target
+           #:settings-options
+           #:settings-futures))
 
 (declaim (optimize (debug 3) (safety 3)))
 
