@@ -200,7 +200,7 @@
   (handler-case
       (let ((stdin *standard-input*)
             ;; (stdout *standard-output*)
-            (player (make-player 'connector-player :gambling t :tricky nil :use-options t))
+            (player (make-player 'connector-player :gambling t :tricky nil :use-options t :smart-options t))
             (*package* (find-package :src/main)))
      
         (debug-log "Sending me...~%")
