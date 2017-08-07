@@ -188,7 +188,7 @@
            :initform nil
            :initarg :tricky)
    (use-options :accessor use-options
-                :initform nil
+                :initform t
                 :initarg :use-options)))
 
 (defun find-connecting-move (graph current-network target)
@@ -413,10 +413,15 @@
                       futures))
             (values mines-order score))))))
 
+(defparameter *seconds-to-choose* 7)
+
 (defun find-best-mines-order (graph distance-tab mines num-moves &key gamble)
   (let ((max-score 0)
         (best-order nil)
-        (best-futures nil))
+        (best-futures nil)
+        (panic-time (+ (get-internal-run-time)
+                       (* *seconds-to-choose*
+                          internal-time-units-per-second))))
     (loop :for mine :in mines
        :do (multiple-value-bind (order score futures)
                (build-full-network graph distance-tab mine mines num-moves
@@ -424,7 +429,11 @@
              (when (> score max-score)
                (setf max-score score)
                (setf best-order order)
-               (setf best-futures futures))))
+               (setf best-futures futures)
+               (when (>= (get-internal-run-time)
+                         panic-time)
+                 ;; (format t "Start timed out: ~%")
+                 (return)))))
     ;; (format t "Best order : ~A~%" best-order)
     (values (or best-order
                 mines)
