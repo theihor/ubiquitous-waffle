@@ -115,13 +115,9 @@
         (yason:with-array ()
           (dolist (x obj)
             (yason:encode-array-element x)))
-        (yason:with-object ()
-          (yason:encode-object-element
-           "__type" "PAIR")
-          (yason:encode-object-element
-           "car" (car obj))
-          (yason:encode-object-element
-           "cdr" (cdr obj))))))
+        (yason:with-array ()
+          (yason:encode-array-element (car obj))
+          (yason:encode-array-element (cdr obj))))))
 
 (defmethod yason:encode ((obj symbol) &optional stream)
   (yason:with-output (stream)
