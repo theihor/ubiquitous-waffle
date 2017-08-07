@@ -190,7 +190,10 @@
            :initarg :tricky)
    (use-options :accessor use-options
                 :initform t
-                :initarg :use-options)))
+                :initarg :use-options)
+   (smart-options :accessor smart-options
+                  :initform t
+                  :initarg :smart-options)))
 
 (defun find-connecting-move (graph current-network target)
   (if (gethash target current-network)
@@ -596,7 +599,7 @@
                avail-options
                current-network locations-table
                state claimed-mines
-               tricky)
+               tricky smart-options)
       player
     (labels ((%claim (location kind)
                (when (eq kind :mine)
@@ -638,11 +641,12 @@
                (let ((path (find-regions-connecting-move avail-graph current-network locations-table)))
                  (if (and (null path)
                           (> avail-options 0))
-                     ;;(find-regions-connecting-move avail-option-graph current-network locations-table)
-                     (let ((paths (k-shortest-between-regions avail-option-graph 3 '(:a :b)
-                                                              current-network locations-table)))
-                       (car (sort (copy-list paths) #'<
-                                  :key #'%path-num-options)))
+                     (if smart-options
+                         (let ((paths (k-shortest-between-regions avail-option-graph 3 '(:a :b)
+                                                                  current-network locations-table)))
+                           (car (sort (copy-list paths) #'<
+                                      :key #'%path-num-options)))
+                         (find-regions-connecting-move avail-option-graph current-network locations-table))
                      path)))
              (%do-move-targeted ()
                (if (> (hash-table-count locations-table) 0)
