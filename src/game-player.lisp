@@ -302,7 +302,8 @@
         (move-num-tab (make-hash-table :test #'equal))
         (mine-tab (make-hash-table :test #'equal))
         (target-order nil)
-        (claimed-mines nil))
+        (claimed-mines nil)
+        (moves-cap (floor (* 0.2 num-moves))))
     (loop :for mine :in mines
        :do (setf (gethash mine mine-tab) t))
     ;; (push start-mine claimed-mines)
@@ -352,14 +353,15 @@
                  ;; (format t "Computed score for order ~A, claimed ~A, score: ~A~%"
                  ;;         (reverse target-order) claimed-mines score)
                 score))
-             (%moves-cap ()
-               (floor (* 0.5 num-moves)))
              (%gamble ()
                (let ((futures nil))
                  (loop :for mine :in claimed-mines
+                    :when (< (or (gethash mine move-num-tab)
+                                 1000000000)
+                             moves-cap)
                     :do (multiple-value-bind (node dist)
                             (node-with-max-distance mine distance-tab
-                                                    move-num-tab (%moves-cap))
+                                                    move-num-tab moves-cap)
                           (when node
                             (push (list mine node (* dist dist dist))
                                   futures))))

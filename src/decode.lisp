@@ -35,9 +35,9 @@
    :rivers (parse-rivers-inner (gethash "rivers" map-ht))
    :mines (gethash "mines" map-ht)))
 
-(defun parse-claim (claim-ht)
+(defun parse-claim (claim-ht &optional (class-sym 'claim))
   (make-instance
-   'claim
+   class-sym
    :punter (gethash "punter" claim-ht)
    :source (gethash "source" claim-ht)
    :target (gethash "target" claim-ht)))
@@ -61,6 +61,8 @@
      (parse-pass it))
     ((gethash "splurge" move-ht)
      (parse-splurge it))
+    ((gethash "option" move-ht)
+     (parse-claim it 'option))
     (t (error "unknown type of move"))))
 
 (defun parse-moves-inner (moves-ht)
@@ -95,7 +97,8 @@
    'settings
    :futures (when settings-ht
               (gethash "futures" settings-ht)
-              (gethash "splurges" settings-ht))))
+              (gethash "splurges" settings-ht)
+              (gethash "optoins" settings-ht))))
 
 (defun parse-setup-inner (setup-ht)
   (make-instance
