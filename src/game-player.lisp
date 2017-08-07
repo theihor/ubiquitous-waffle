@@ -303,7 +303,7 @@
 (defun estimate-node-score (node claimed-mines distance-tab)
   (loop
      :for claimed-mine :in claimed-mines
-     :for val = (gethash (cons claimed-mine node) distance-tab)
+     :for val = (gethash (list claimed-mine node) distance-tab)
      :when val
      :summing (* val val)))
 
@@ -312,8 +312,8 @@
         (max-dist 0))
     (maphash (lambda (node move-num)
                (when (< move-num moves-cap)
-                 (let ((dist (gethash (cons mine node) distance-tab))
-                       (rev-dist (gethash (cons node mine) distance-tab)))
+                 (let ((dist (gethash (list mine node) distance-tab))
+                       (rev-dist (gethash (list node mine) distance-tab)))
                    ;; Do not bid on mines
                    (when (and (null rev-dist)
                               (> dist max-dist))
