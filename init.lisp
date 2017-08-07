@@ -40,6 +40,8 @@
 (ql:quickload 'trivial-timeout)
 ;; (ql:quickload :cl-rl)
 
+(ql:quickload 'cl-heap)
+
 (in-package :cl-user)
 
 (require 'sb-sprof)
