@@ -39,6 +39,9 @@
 ;; (ql:quickload :cl-rl)
 
 (in-package :cl-user)
+
+(require 'sb-sprof)
+
 (asdf:initialize-source-registry '(:source-registry
                                    :inherit-configuration
                                    (:directory :here)
