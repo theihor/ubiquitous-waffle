@@ -158,6 +158,7 @@
          :when (and (>= available-moves dist)
                     (not (gethash mine mines)))
          :do
+         (when (<= available-moves 0) (return))
          (push
           (make-instance 'future :source mine :target target) result)
          (setf (gethash mine mines) t)
