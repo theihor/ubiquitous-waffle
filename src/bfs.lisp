@@ -36,7 +36,7 @@
     (loop :for source :in source-nodes :do
        (let ((distances (bfs-distances g source)))
          (maphash (lambda (target d)
-                    (setf (gethash (cons source target) result) d))
+                    (setf (gethash (list source target) result) d))
                   distances)))
     result))
 
