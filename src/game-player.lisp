@@ -156,17 +156,10 @@
                 :initform nil)
    (current-network :accessor current-network
                     :initform nil)
-   ;; TODO: remove when future-player is fixed
-   (mines :accessor mines
-          :initform nil)
    (claimed-mines :accessor claimed-mines
                   :initform nil)
-   (locations :accessor locations
-              :initform nil)
-   (starting-locations :accessor starting-locations
-                       :initform nil)
-   (not-reached-locations :accessor not-reached-locations
-                          :initform nil)
+   (locations-table :accessor locations-table
+                    :initform nil)
    (gambling :accessor gambling
              :initform nil
              :initarg :gambling)
@@ -208,6 +201,14 @@
              (declare (ignore val))
              (when (gethash key big-tab)
                (return-from hash-tables-intersect? key)))
+           small-tab)
+  nil)
+
+(defun hash-tables-clear-intersections (big-tab small-tab func)
+  (maphash (lambda (key val)
+             (when (gethash key big-tab)
+               (funcall func key val)
+               (remhash key small-tab)))
            small-tab)
   nil)
 
@@ -429,8 +430,16 @@
   (setf (game-map state) nil)
   (setf (sites state) nil))
 
+(defun mines-table (mines)
+  (let ((tab (make-hash-table :test #'equal)))
+    (loop :for mine :in mines
+       :do (setf (gethash mine tab) t))
+    tab))
+
 (defmethod init-player :after ((player connector-player) setup-message)
-  (with-slots (avail-graph state current-network gambling tricky futures) player
+  (with-slots (avail-graph state current-network gambling tricky futures
+                           locations-table)
+      player
     (setf avail-graph (clone-graph (game-map state)))
     (setf current-network (make-hash-table :test #'equal))
     (let* ((mines (mines state))
@@ -447,46 +456,44 @@
            ;;                 (sort (copy-list mine-scores)
            ;;                       #'<
            ;;                       :key #'cdr)))
-           )
+           (mines-tab (mines-table mines)))
       (multiple-value-bind (sorted cool-futures)
           (find-best-mines-order avail-graph (distance-tab state)
                                  mines (floor (length (map-rivers (setup-map setup-message)))
                                               (players-number state))
                                  :gamble gambling)
-        (setf (mines player) sorted)
         (when cool-futures
           (setf futures
                 (loop :for (mine node _) :in cool-futures
                    :collect (make-instance 'future
                                            :source mine
                                            :target node))))
-        (setf (starting-locations player)
-              (mapcar (lambda (node)
-                        (if tricky
-                            (make-location :mine node :cluster (singleton-hash-table node))
-                            (make-location :mine node)))
-                      sorted))))
-    (clear-state state)))
+        (setf locations-table (make-hash-table :test #'equal))
+        (loop :for location :in sorted
+           :do (setf (gethash location locations-table)
+                     (if (gethash location mines-tab)
+                         :mine
+                         :future)))
+        ;; Start from first
+        (setf (gethash (car sorted) current-network) t)
+        (clear-state state)))))
 
 (defmethod update-player :after ((player connector-player) moves)
-  (with-slots (current-network avail-graph state locations tricky) player
+  (with-slots (current-network avail-graph state locations-table tricky) player
     (mapc-claims
      moves
      (lambda (id src trgt)
        (remove-edge avail-graph src trgt)
        (when (= id (id state))
          (if (or (gethash src current-network)
-                 (gethash src current-network))
+                 (gethash trgt current-network))
              (progn
                (setf (gethash src current-network) t)
                (setf (gethash trgt current-network) t))
-             (when tricky
-               (loop :for location :in locations
-                  :do (when (and (cluster location)
-                                 (or (gethash src (cluster location))
-                                     (gethash trgt (cluster location))))
-                        (setf (gethash src (cluster location)) t)
-                        (setf (gethash trgt (cluster location)) t))))))))))
+             (when (or (gethash src locations-table)
+                       (gethash trgt locations-table))
+               (setf (gethash src locations-table) t)
+               (setf (gethash trgt locations-table) t))))))))
 
 (defun extract-first (list predicate &optional acc)
   (if (null list)
@@ -495,64 +502,109 @@
           (values (car list) (append (reverse acc) (cdr list)))
           (extract-first (cdr list) predicate (cons (car list) acc)))))
 
+(defun filter-alive-locs (graph table)
+  (maphash (lambda (node kind)
+             (declare (ignore kind))
+             (unless (any-neighbour graph node)
+               (remhash node table)))
+           table))
+
+(defun sub-cluster-moves (graph start-node cluster visited)
+  (let ((adj (make-hash-table :test #'equal)))
+    (labels ((%node (node)
+               (mapc-node-edges
+                graph node
+                (lambda (neighbour data)
+                  (declare (ignore data))
+                  (unless (gethash neighbour cluster)
+                    (setf (gethash neighbour adj) node)))))
+             (%nodes (nodes)
+               (let ((next-nodes nil))
+                 (loop :for node :in nodes
+                    :do (unless (gethash node visited)
+                          (setf (gethash node visited) t)
+                          (%node node)
+                          (mapc-node-edges
+                           graph node
+                           (lambda (neighbour data)
+                             (declare (ignore data))
+                             (when (and (gethash neighbour cluster)
+                                        (not (gethash neighbour visited)))
+                               (push neighbour next-nodes))))))
+                 (when next-nodes
+                   (%nodes next-nodes)))))
+      (%nodes (list start-node)))
+    adj))
+
 (defmethod select-move ((player connector-player))
-  (with-slots (avail-graph current-network locations
-                           starting-locations state claimed-mines
-                           not-reached-locations
+  (with-slots (avail-graph current-network locations-table
+                           state claimed-mines
                            tricky)
       player
-    (labels ((%claim (location)
-               (when (mine-location? location)
-                 (push (node location) claimed-mines)))
+    (labels ((%claim (location kind)
+               (when (eq kind :mine)
+                 (push location claimed-mines)))
              (%do-move ()
                (if tricky
                    (%tricky-check-locations)
-                   (%do-move-non-tricky)))
+                   (%do-move-targeted)))
+             (%too-narrow? (tab)
+               (let ((freedom (hash-table-count tab)))
+                 (and (> freedom 0)
+                      (< freedom 3))))
+             (%any-move (tab)
+               (maphash (lambda (node from-node)
+                          (return-from %any-move (values from-node node)))
+                        tab))
              (%tricky-check-locations ()
-               (let ((network-freedom (cluster-freedom avail-graph current-network)))
-                 (loop :for location :in locations
-                    :do (unless (hash-tables-intersect? current-network (cluster location))
-                          (let ((freedom (cluster-freedom avail-graph (cluster location))))
-                            (when (and freedom
-                                       (> freedom 0)
-                                       (< freedom 3)
-                                       (< (+ freedom 2) network-freedom))
-                              (multiple-value-bind (src trgt)
-                                  (extend-cluster avail-graph (cluster location))
-                                (player-log player "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
-                                            (node location) freedom src trgt)
-                                (return-from %tricky-check-locations (make-claim state src trgt))))))))
-               (%do-move-tricky))
-             (%do-move-non-tricky ()
-               (if locations
-                   (let ((next-location (car locations)))
-                     (multiple-value-bind (src trgt)
-                         (find-connecting-move avail-graph current-network (node next-location))
-                       (cond ((or (eq src t)
-                                  (eq src nil))
-                              (let ((claimed-location (pop locations)))
-                                (if (eq src t)
-                                    (%claim claimed-location)
-                                    (push claimed-location not-reached-locations)))
-                              (%do-move-non-tricky))
-                             (t (make-claim state src trgt)))))
-                   (%do-random-move)))
-             (%do-move-tricky ()
-               (if locations
-                   (let ((next-location (car locations)))
+               (let ((visted (make-hash-table :test #'equal)))
+                 (maphash
+                  (lambda (node kind)
+                    (declare (ignore kind))
+                    (unless (gethash node visted)
+                      (let ((moves (sub-cluster-moves avail-graph node locations-table visted)))
+                        (when (%too-narrow? moves)
+                          (multiple-value-bind (src trgt)
+                              (%any-move moves)
+                            (player-log player "Tricky freedom: ~A, extending: ~A -> ~A~%"
+                                        (hash-table-count moves) src trgt)
+                            (return-from %tricky-check-locations (make-claim state src trgt)))))))
+                  locations-table))
+               ;; (let ((network-freedom (cluster-freedom avail-graph current-network)))
+               ;;   (loop :for location :in locations
+               ;;      :do (unless (hash-tables-intersect? current-network (cluster location))
+               ;;            (let ((freedom (cluster-freedom avail-graph (cluster location))))
+               ;;              (when (and freedom
+               ;;                         (> freedom 0)
+               ;;                         (< freedom 3)
+               ;;                         (< (+ freedom 2) network-freedom))
+               ;;                (multiple-value-bind (src trgt)
+               ;;                    (extend-cluster avail-graph (cluster location))
+               ;;                  (player-log player "Location: ~A, freedom: ~A, extending: ~A -> ~A~%"
+               ;;                              (node location) freedom src trgt)
+               ;;                  (return-from %tricky-check-locations (make-claim state src trgt))))))))
+               (%do-move-targeted))
+             (%do-move-targeted ()
+               (if (> (hash-table-count locations-table) 0)
+                   (progn
+                     (hash-tables-clear-intersections
+                      current-network
+                      locations-table
+                      (lambda (node kind)
+                        (%claim node kind)))
                      (let ((path
-                            (find-regions-connecting-move avail-graph current-network (cluster next-location))))
+                            (find-regions-connecting-move avail-graph current-network locations-table)))
                        (player-log player "Connecting ~A and ~A : ~A~%" (alexandria:hash-table-keys current-network)
-                                   (alexandria:hash-table-keys (cluster next-location))
+                                   (alexandria:hash-table-keys locations-table)
                                    path)
-                       (cond ((or (null path)
-                                  (null (cdr path)))
-                              (let ((claimed-location (pop locations)))
-                                (if (null (cdr path))
-                                    (%claim claimed-location)
-                                    (push claimed-location not-reached-locations)))
-                              (%do-move-tricky))
-                             (t (make-claim state (first path) (second path))))))
+                       (cond
+                         ((null path)
+                          (%do-random-move))
+                         ((null (cdr path))
+                          (%claim (car path) (gethash (car path) locations-table))
+                          (remhash (car path) locations-table)
+                          (%do-move-targeted))
+                         (t (make-claim state (first path) (second path))))))
                    (%do-random-move)))
              (%do-random-move ()
                (let ((max-move (find-best-non-targeted-move avail-graph current-network
@@ -560,35 +612,38 @@
                  (player-log player "Random move : ~A~%" max-move)
                  (if max-move
                      (make-claim state (car max-move) (cdr max-move))
-                     (%try-not-reached))))
-             (%try-not-reached ()
-               (if not-reached-locations
+                     (%reset-targets))))
+             (%reset-targets ()
+               (filter-alive-locs avail-graph locations-table)
+               (if (> (hash-table-count locations-table) 0)
                    (progn
-                     (%init-locations (reverse not-reached-locations))
-                     (setf not-reached-locations nil)
+                     ;; Reset to another cluster
+                     (player-log player "Reset to another cluster, alive objects: ~A~%"
+                                 (alexandria:hash-table-plist locations-table))
+                     (let ((start
+                            (block find-mine
+                              (maphash (lambda (node kind)
+                                         (when (eq kind :mine)
+                                           (return-from find-mine node)))
+                                       locations-table))))
+                       (if start
+                           (progn
+                             (player-log player "Cluster : ~A -> ~A~%"
+                                         start (alexandria:hash-table-keys locations-table))
+                             (setf (gethash start current-network) t)
+                             ;; Another cluster - another score
+                             (setf claimed-mines nil)
+                             (%do-move))
+                           (progn
+                             (player-log player "Give up :~%")
+                             ;; Give up
+                             (clrhash locations-table)
+                             (%do-totally-random-move))))
                      (%do-move))
                    (%do-totally-random-move)))
              (%do-totally-random-move ()
                (let ((node (any-node avail-graph)))
                  (if node
                      (make-claim state node (any-neighbour avail-graph node))
-                     (make-pass state))))
-             (%filter-locs (locs)
-               (remove-if-not
-                (lambda (loc)
-                  (any-neighbour avail-graph (node loc)))
-                locs))
-             (%init-locations (locs)
-               (let ((alive-locs (%filter-locs locs)))
-                 (multiple-value-bind (first-loc other-locs)
-                     (extract-first alive-locs #'mine-location?)
-                   (if first-loc
-                       (progn
-                         (setf (gethash (node first-loc) current-network) t)
-                         (%claim first-loc)
-                         (setf locations other-locs))
-                       ;; Oops
-                       (setf locations nil))))))
-      (when (= (hash-table-count current-network) 0)
-        (%init-locations starting-locations))
+                     (make-pass state)))))
       (%do-move))))
