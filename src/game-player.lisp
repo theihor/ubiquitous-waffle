@@ -468,10 +468,11 @@
                            use-options)
       player
     (setf avail-graph (clone-graph (game-map state)))
-    (unless (settings-options (setup-settings setup-message))
-      (setf use-options nil))
-    (unless (settings-futures (setup-settings setup-message))
-      (setf gambling nil))
+    (when (setup-settings setup-message)
+      (unless (settings-options (setup-settings setup-message))
+        (setf use-options nil))
+      (unless (settings-futures (setup-settings setup-message))
+        (setf gambling nil)))
     (when use-options
       (setf avail-option-graph (clone-graph avail-graph))
       (setf avail-options (length (mines state))))
