@@ -178,7 +178,7 @@
   (apply #'format *standard-output* str params)
   (finish-output *standard-output*))
 
-(defparameter *do-logging* t)
+(defparameter *do-logging* nil)
 (defparameter *logger-name* "punter")
 
 (defun debug-log (str &rest params)
