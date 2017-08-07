@@ -120,9 +120,6 @@
           ((string= type "HASH-TABLE")
            (alexandria:plist-hash-table
             (mapcar #'total-parse-inner (gethash "content" ht))))
-          ((string= type "PAIR")
-           (cons (total-parse-inner (gethash "car" ht))
-                 (total-parse-inner (gethash "cdr" ht))))
           ((string= type "KEYWORD")
            (intern (gethash "value" ht) :keyword))
           ((string= type "SYM")
