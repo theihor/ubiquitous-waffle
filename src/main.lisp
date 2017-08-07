@@ -191,7 +191,9 @@
           (sb-sprof:start-profiling :max-samples 1000 :mode :time :sample-interval 0.001)
           (progn ,@body)
           (sb-sprof:stop-profiling)
-          (sb-sprof:report :min-percent 1 :type :flat :stream *error-output*)))
+          (cl-user::sbcl-print-callgraph-in-dot-format "~/profile.dot")
+          ;; (sb-sprof:report :min-percent 1 :type :flat :stream *error-output*)
+          ))
 
 ;; via stdin, stdout, stderr
 (defun main-offline ()
