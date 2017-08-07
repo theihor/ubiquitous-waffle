@@ -208,46 +208,45 @@
     (format-std "~A" (encode-me "SpiritRaccoons"))
     (debug-log "Sent me~%")
     (debug-log "Getting you... ~A~%" (read-with-size stdin))
-    (with-profiling
-        (let ((msg (read-with-size stdin)))
-          ;; (debug-log "From server: ~A~%" msg)
-          (multiple-value-bind (m state) (parse msg)
-            (debug-log "m: ~A~%" m)
-            (cond
-              ((numberp m)
-               (debug-log "Failed with timeout ~A~%" m)
-               t)
-              ((typep m 'setup)
-               (debug-log "Init new player.~%")
-               (init-player player m)
-               (debug-log "Sending ready...~%")
-               ;; TODO: Futures should be in ready
-               (format-std "~A" (encode-ready (setup-punter m) :state player)))
-              ((typep m 'stop)
-               (progn
-                 (debug-log "Game stop.~%")
-                 (when (typep (state player) 'game-with-scores)
-                   (debug-log "Computed score:~%")
-                   (loop :for punter :below (players-number (state player))
-                      :do (debug-log "~A :~A~%"
-                                     punter
-                                     (score (elt (punters (state player)) punter)))))))
-              ((or (null m)
-                   (typep (car m) 'move))
-               (debug-log "Getting new moves...~%")
-               (when state
-                 (setf player state)
-                 (update-player player m)
-                 (debug-log "Player updated...~%")
-                 (let* ((new-move (select-move player))
-                        (dummy (setf (move-state new-move) player))
-                        (dummy2 (debug-log "Move selected...~%"))
-                        (encoded-move (encode-move new-move)))
-                   (declare (ignorable dummy dummy2))
-                   (debug-log "Sending move...~%")
-                   (format-std "~A" encoded-move)))
-               )
-              (t (debug-log "Timeout.~%"))))))
+    (let ((msg (read-with-size stdin)))
+      ;; (debug-log "From server: ~A~%" msg)
+      (multiple-value-bind (m state) (parse msg)
+        (debug-log "m: ~A~%" m)
+        (cond
+          ((numberp m)
+           (debug-log "Failed with timeout ~A~%" m)
+           t)
+          ((typep m 'setup)
+           (debug-log "Init new player.~%")
+           (init-player player m)
+           (debug-log "Sending ready...~%")
+           ;; TODO: Futures should be in ready
+           (format-std "~A" (encode-ready (setup-punter m) :state player)))
+          ((typep m 'stop)
+           (progn
+             (debug-log "Game stop.~%")
+             (when (typep (state player) 'game-with-scores)
+               (debug-log "Computed score:~%")
+               (loop :for punter :below (players-number (state player))
+                  :do (debug-log "~A :~A~%"
+                                 punter
+                                 (score (elt (punters (state player)) punter)))))))
+          ((or (null m)
+               (typep (car m) 'move))
+           (debug-log "Getting new moves...~%")
+           (when state
+             (setf player state)
+             (update-player player m)
+             (debug-log "Player updated...~%")
+             (let* ((new-move (select-move player))
+                    (dummy (setf (move-state new-move) player))
+                    (dummy2 (debug-log "Move selected...~%"))
+                    (encoded-move (encode-move new-move)))
+               (declare (ignorable dummy dummy2))
+               (debug-log "Sending move...~%")
+               (format-std "~A" encoded-move)))
+           )
+          (t (debug-log "Timeout.~%")))))
     )
   )
 
@@ -314,6 +313,7 @@
        ;; :for steps := 0 :then (1+ steps)
        :while (< steps rivers) :do
        (let* ()
+         (sb-ext:gc :full t)
          (restart-bot bot)
          (unless (id bot)
            (setf (id bot) (incf new-id)))
@@ -339,7 +339,7 @@
                             (encoded-moves
                              (encode-moves moves (gethash id player-table)))
                             (response 0))
-                       (trivial-timeout:with-timeout (20)
+                       (trivial-timeout:with-timeout (1)
                          (time
                           (progn
                             ;; send current moves and state

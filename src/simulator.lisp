@@ -32,4 +32,4 @@
    :settings settings :map map :punters punters :punter punter))
 
 (defun make-stop (moves scores)
-  (make-intance 'stop :moves moves :scores scores))
+  (make-instance 'stop :moves moves :scores scores))
