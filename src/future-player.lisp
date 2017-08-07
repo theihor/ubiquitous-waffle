@@ -69,7 +69,7 @@
                (cons mine
                      (loop
                         :for other-mine :in mines
-                        :for dist = (gethash (cons mine other-mine) (distance-tab state))
+                        :for dist = (gethash (list mine other-mine) (distance-tab state))
                         :when dist
                         :summing dist))))
            (sorted (mapcar #'car
@@ -107,7 +107,7 @@
              (%dist (node)
                (loop
                   :for claimed-mine :in claimed-mines
-                  :for val = (gethash (cons claimed-mine node) (distance-tab state))
+                  :for val = (gethash (list claimed-mine node) (distance-tab state))
                   :when val
                   :summing (* val val)))
              (%do-random-move ()
@@ -153,7 +153,7 @@
     (setf all-futures (sort all-futures #'> :key #'cdr))
     (let ((mines (make-hash-table))
           (result))
-      (loop :for ((mine . target) . dist) :across all-futures
+      (loop :for ((mine target) . dist) :across all-futures
          :with available-moves = moves
          :when (and (>= available-moves dist)
                     (not (gethash mine mines)))
