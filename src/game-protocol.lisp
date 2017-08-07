@@ -31,7 +31,9 @@
            #:settings
            #:future
            #:future-source
-           #:future-target))
+           #:future-target
+           #:settings-options
+           #:settings-futures))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -71,15 +73,19 @@
   ((source :initarg :source :accessor claim-source)
    (target :initarg :target :accessor claim-target)))
 
-(defmethod print-object ((c claim) s)
-  (format s "~A->~A" (claim-source c) (claim-target c)))
-
 (defclass pass (move) ())
 
 (defclass splurge (move)
   ((route :initarg :route :accessor splurge-route)))
 
 (defclass option (claim) ())
+
+(defmethod print-object ((c claim) s)
+  (format s "<claim ~A->~A>" (claim-source c) (claim-target c)))
+
+(defmethod print-object ((c option) s)
+  (format s "<option ~A->~A>" (claim-source c) (claim-target c)))
+
 ;;;
 
 (defclass stop ()

@@ -98,7 +98,7 @@
        'settings
        :futures (gethash "futures" settings-ht)
        :splurges (gethash "splurges" settings-ht)
-       :options (gethash "optoins" settings-ht))
+       :options (gethash "options" settings-ht))
       (make-instance 'settings)))
 
 (defun parse-setup-inner (setup-ht)
@@ -132,9 +132,6 @@
           ((string= type "HASH-TABLE")
            (alexandria:plist-hash-table
             (mapcar #'total-parse-inner (gethash "content" ht))))
-          ((string= type "PAIR")
-           (cons (total-parse-inner (gethash "car" ht))
-                 (total-parse-inner (gethash "cdr" ht))))
           ((string= type "KEYWORD")
            (intern (gethash "value" ht) :keyword))
           ((string= type "SYM")
