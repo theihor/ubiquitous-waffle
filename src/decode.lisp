@@ -1,12 +1,16 @@
 (uiop:define-package :src/decode
     (:use :common-lisp :anaphora :src/game-protocol)
   (:export #:parse
+           #:parse-me
            #:parse-you
            #:parse-setup
+           #:parse-ready
            #:parse-moves
+           #:parse-move-with-state
            #:parse-stop
            #:parse-map
-           #:total-parse))
+           #:total-parse
+           #:parse-map-from-file))
 
 (declaim (optimize (debug 3) (safety 3)))
 
@@ -80,6 +84,9 @@
 (defun get-handshake (msg-ht)
   (gethash "you" msg-ht))
 
+(defun get-confirmation (msg-ht)
+  (gethash "me" msg-ht))
+
 (defun setup-p (msg-ht)
   (and (gethash "punter" msg-ht)
        (gethash "punters" msg-ht)
@@ -100,6 +107,10 @@
    :punters (gethash "punters" setup-ht)
    :map (parse-map-inner (gethash "map" setup-ht))
    :settings (parse-settings-inner (gethash "settings" setup-ht))))
+
+(defun parse-ready-inner (ready-ht)
+  "Return initial state hash-table"
+  (gethash "state" ready-ht))
 
 (defun get-move (msg-ht)
   (gethash "move" msg-ht))
@@ -147,6 +158,9 @@
                     (t ht))
               ht))))
 
+(defun parse-me (msg)
+  (let ((me-ht (yason:parse msg)))
+    (get-confirmation me-ht)))
 
 (defun parse-you (msg)
   (let ((you-ht (yason:parse msg)))
@@ -156,9 +170,19 @@
   (let ((setup-ht (yason:parse msg)))
     (parse-setup-inner setup-ht)))
 
+(defun parse-ready (msg)
+  (let ((ready-ht (yason:parse msg)))
+    (parse-ready-inner ready-ht)))
+
 (defun parse-moves (msg)
   (let ((move-ht (yason:parse msg)))
     (parse-moves-inner (get-move move-ht))))
+
+(defun parse-move-with-state (msg)
+  (let ((move-ht (yason:parse msg)))
+    (values
+     (parse-move move-ht)
+     (gethash "state" move-ht))))
 
 (defun parse-stop (msg)
   (let ((score-ht (yason:parse msg)))
