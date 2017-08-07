@@ -93,12 +93,13 @@
        (gethash "map" msg-ht)))
 
 (defun parse-settings-inner (settings-ht)
-  (make-instance
-   'settings
-   :futures (when settings-ht
-              (gethash "futures" settings-ht)
-              (gethash "splurges" settings-ht)
-              (gethash "optoins" settings-ht))))
+  (if settings-ht
+      (make-instance
+       'settings
+       :futures (gethash "futures" settings-ht)
+       :splurges (gethash "splurges" settings-ht)
+       :options (gethash "optoins" settings-ht))
+      (make-instance 'settings-ht)))
 
 (defun parse-setup-inner (setup-ht)
   (make-instance
