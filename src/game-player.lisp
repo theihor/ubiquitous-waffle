@@ -188,7 +188,7 @@
            :initform nil
            :initarg :tricky)
    (use-options :accessor use-options
-                :initform nil
+                :initform t
                 :initarg :use-options)))
 
 (defun find-connecting-move (graph current-network target)
