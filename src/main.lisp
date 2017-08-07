@@ -200,7 +200,7 @@
 
   (let ((stdin *standard-input*)
         ;; (stdout *standard-output*)
-        (player (make-player 'connector-player :gambling t :tricky nil))
+        (player (make-player 'connector-player :gambling t :tricky nil :use-options t))
         (*package* (find-package :src/main)))
     
     (debug-log "Sending me...~%")
@@ -238,7 +238,9 @@
              (setf player state)
              (update-player player m)
              (debug-log "Player updated...~%")
-             (let* ((new-move (select-move player))
+             (let* ((new-move (awhen (select-move player)
+                                     (debug-log "Selected move ~A~%" it)
+                                     it))
                     (dummy (setf (move-state new-move) player))
                     (dummy2 (debug-log "Move selected...~%"))
                     (encoded-move (encode-move new-move)))
@@ -354,7 +356,13 @@
                    (progn
                      (debug-log "Performing setup...~%")
                      (write-to-bot bot
-                                   (encode-setup (make-setup id (length botlist) game-map)))
+                                   (encode-setup
+                                    (make-setup id (length botlist) game-map
+                                                (make-instance 'settings
+                                                               :futures t
+                                                               :splurges t
+                                                               :options t))
+                                    ))
                      ;; (debug-log "Sent: ~A~%" (encode-setup (make-setup id (length botlist) game-map)))
                      (setf (gethash id player-table)
                            (parse-ready (read-from-bot bot)))
